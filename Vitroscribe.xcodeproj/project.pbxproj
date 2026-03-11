@@ -20,6 +20,7 @@
 		6FD04C36F1D5E084AE456665 /* AudioEngineManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE8EFC47D042A14771E612C4 /* AudioEngineManager.swift */; };
 		72F09D9EB9DCC5C34DE82E54 /* MeetingJoinOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB5BEB48608D1CD9BE81A077 /* MeetingJoinOverlay.swift */; };
 		79429702740C485E808C5954 /* VitroscribeApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3973C76133B07DA5C539EB5 /* VitroscribeApp.swift */; };
+		94FBF3CFDAA372B05906FA6B /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A3DD190A30052FA154B4D7AB /* Assets.xcassets */; };
 		9CB5D792DB08EE6AD7C8DCAC /* GoogleAuthManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = E092A49E74CF95ADE7330568 /* GoogleAuthManager.swift */; };
 		B7ED8BD8FBB4AFA584F760DE /* GoogleCalendarService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74A29B8192D972B9534A9DE9 /* GoogleCalendarService.swift */; };
 		B927D2909DA6F2AFC0797BA2 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBFFCA7FBA6BADCAB01576FC /* ContentView.swift */; };
@@ -36,6 +37,7 @@
 		3B7383C4943BBFCEA29F76F5 /* DatabaseManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DatabaseManager.swift; sourceTree = "<group>"; };
 		49FDFB2D833A27D86C0D3792 /* RecordingOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingOverlay.swift; sourceTree = "<group>"; };
 		74A29B8192D972B9534A9DE9 /* GoogleCalendarService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoogleCalendarService.swift; sourceTree = "<group>"; };
+		A3DD190A30052FA154B4D7AB /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		A6D8FB23DE19DB33044790AA /* Vitroscribe.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Vitroscribe.entitlements; sourceTree = "<group>"; };
 		AB5BEB48608D1CD9BE81A077 /* MeetingJoinOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MeetingJoinOverlay.swift; sourceTree = "<group>"; };
 		AC18A3D186C65827441B2024 /* PromptOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PromptOverlay.swift; sourceTree = "<group>"; };
@@ -77,6 +79,7 @@
 			children = (
 				BC198CFFD4AD688CFAF200A4 /* Info.plist */,
 				A6D8FB23DE19DB33044790AA /* Vitroscribe.entitlements */,
+				B9FD13FE5F0180624497C4DA /* Resources */,
 				2246B62519345AE3EB9331BA /* Sources */,
 			);
 			path = Vitroscribe;
@@ -124,6 +127,14 @@
 			);
 			sourceTree = "<group>";
 		};
+		B9FD13FE5F0180624497C4DA /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				A3DD190A30052FA154B4D7AB /* Assets.xcassets */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
 		BD683C7DA8C6A777963F4AEA /* Services */ = {
 			isa = PBXGroup;
 			children = (
@@ -155,6 +166,7 @@
 			buildConfigurationList = 19D603C7CEF34C94BAEB25B4 /* Build configuration list for PBXNativeTarget "Vitroscribe" */;
 			buildPhases = (
 				E03CF1560106F2F22939A201 /* Sources */,
+				9E055E674A922BFC25CEE771 /* Resources */,
 				9F68E956FD84500FE86294D3 /* Frameworks */,
 			);
 			buildRules = (
@@ -204,6 +216,17 @@
 			);
 		};
 /* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		9E055E674A922BFC25CEE771 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				94FBF3CFDAA372B05906FA6B /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		E03CF1560106F2F22939A201 /* Sources */ = {

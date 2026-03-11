@@ -4,6 +4,14 @@
 <dict>
 	<key>files</key>
 	<dict>
+		<key>Resources/AppIcon.icns</key>
+		<data>
+		FsZgX58sXLHnaYvH4Dt4kOJO3r4=
+		</data>
+		<key>Resources/Assets.car</key>
+		<data>
+		nGaQCf0W/zAoU4wSRz+TGqYSG44=
+		</data>
 		<key>Resources/SQLite.swift_SQLite.bundle/Contents/Info.plist</key>
 		<data>
 		LgtFaaj1ks2uREaVZM8LQuI4BMc=
@@ -19,10 +27,10 @@
 		<dict>
 			<key>cdhash</key>
 			<data>
-			rw/IuQPIsvyfv8mVCY91+obKj7E=
+			o5Fry3a0EPsrIZ1ZAadh8K+4zZk=
 			</data>
 			<key>requirement</key>
-			<string>cdhash H"af0fc8b903c8b2fc9fbfc995098f75fa86ca8fb1"</string>
+			<string>cdhash H"a3916bcb76b410fb2b219d5901a761f0afb8cd99"</string>
 		</dict>
 		<key>MacOS/__preview.dylib</key>
 		<dict>
@@ -32,6 +40,20 @@
 			</data>
 			<key>requirement</key>
 			<string>cdhash H"b48e80d32897e19339e45896918486a22f616df8"</string>
+		</dict>
+		<key>Resources/AppIcon.icns</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			GipWM8Cgt7AdP5Pb6pRKssPcbHYgtlhtIaZcL02FDCQ=
+			</data>
+		</dict>
+		<key>Resources/Assets.car</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			tVmAG6vICchIDS5j1CMRyPLYXLVzI5bbebif075INto=
+			</data>
 		</dict>
 		<key>Resources/SQLite.swift_SQLite.bundle/Contents/Info.plist</key>
 		<dict>
