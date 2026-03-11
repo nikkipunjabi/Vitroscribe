@@ -84,7 +84,6 @@ struct ContentView: View {
                 }
                 
                 VStack(spacing: 0) {
-                    // 1. Finalized Transcript Area (TOP ALIGNED)
                     ScrollViewReader { proxy in
                         ScrollView {
                             VStack(alignment: .leading, spacing: 16) {
@@ -108,7 +107,6 @@ struct ContentView: View {
                                         .lineSpacing(4)
                                         .textSelection(.enabled)
                                     
-                                    // Anchor to keep history followed
                                     Color.clear
                                         .frame(height: 1)
                                         .id("HISTORY_BOTTOM")
@@ -123,7 +121,6 @@ struct ContentView: View {
                         }
                     }
                     
-                    // 2. Live Caption Area (BOTTOM PINNED)
                     if !audioManager.activeSpeech.isEmpty {
                         VStack(alignment: .leading, spacing: 8) {
                             HStack {
@@ -157,7 +154,6 @@ struct ContentView: View {
                             removal: .opacity.combined(with: .scale(scale: 0.95))
                         ))
                     } else {
-                        // Empty spacer to keep layout stable
                         Spacer().frame(height: 20)
                     }
                 }
@@ -180,7 +176,6 @@ struct ContentView: View {
                 .tag(2)
         }
         .padding()
-        // Ensure initial meeting detector is active when app opens
         .onAppear {
             _ = MeetingDetector.shared
         }

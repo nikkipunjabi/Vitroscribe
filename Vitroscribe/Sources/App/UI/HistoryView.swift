@@ -4,6 +4,7 @@ struct HistoryView: View {
     @State private var sessions: [DatabaseManager.SessionMetadata] = []
     @State private var selectedSessionId: String?
     @State private var currentTranscriptText: String = ""
+    @State private var isSidebarVisible: Bool = true
     
     private let dateFormatter: DateFormatter = {
         let formatter = DateFormatter()
@@ -13,39 +14,56 @@ struct HistoryView: View {
     }()
     
     var body: some View {
-        NavigationSplitView {
-            VStack {
-                List(sessions, selection: $selectedSessionId) { session in
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(dateFormatter.string(from: session.createdAt))
-                            .font(.headline)
-                        Text("Session: \(session.id.prefix(8))...")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                    .padding(.vertical, 4)
-                    .tag(session.id)
-                    .contextMenu {
-                        Button(role: .destructive) {
-                            deleteSession(session.id)
-                        } label: {
-                            Label("Delete Session", systemImage: "trash")
+        HStack(spacing: 0) {
+            // MARK: - Sidebar
+            if isSidebarVisible {
+                VStack(spacing: 0) {
+                    List(sessions, selection: $selectedSessionId) { session in
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(dateFormatter.string(from: session.createdAt))
+                                .font(.headline)
+                            Text("Session: \(session.id.prefix(8))...")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        .padding(.vertical, 4)
+                        .tag(session.id)
+                        .contextMenu {
+                            Button(role: .destructive) {
+                                deleteSession(session.id)
+                            } label: {
+                                Label("Delete Session", systemImage: "trash")
+                            }
                         }
                     }
+                    .listStyle(.sidebar)
+                    
+                    Divider()
+                    
+                    Button(action: clearAll) {
+                        Label("Clear All History", systemImage: "trash")
+                            .foregroundColor(.red)
+                    }
+                    .buttonStyle(.plain)
+                    .padding()
                 }
-                .listStyle(.sidebar)
-                
-                Divider()
-                
-                Button(action: clearAll) {
-                    Label("Clear All History", systemImage: "trash")
-                        .foregroundColor(.red)
-                }
-                .buttonStyle(.plain)
-                .padding()
+                .frame(width: 250)
+                .background(Color(NSColor.windowBackgroundColor).opacity(0.5))
+                .transition(.asymmetric(
+                    insertion: .move(edge: .leading).combined(with: .opacity),
+                    removal: .move(edge: .leading).combined(with: .opacity)
+                ))
             }
-            .navigationSplitViewColumnWidth(min: 200, ideal: 250, max: 300)
-        } detail: {
+            
+            // Decorative Divider that only shows when sidebar is there
+            if isSidebarVisible {
+                Rectangle()
+                    .fill(Color.black.opacity(0.1))
+                    .frame(width: 1)
+                    .ignoresSafeArea()
+            }
+            
+            // MARK: - Detail View
             VStack(alignment: .leading) {
                 if let selectedId = selectedSessionId,
                    let selectedSession = sessions.first(where: { $0.id == selectedId }) {
@@ -80,6 +98,7 @@ struct HistoryView: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .background(Color.black.opacity(0.05))
                             .cornerRadius(8)
+                            .textSelection(.enabled)
                     }
                 } else {
                     VStack(spacing: 20) {
@@ -93,6 +112,20 @@ struct HistoryView: View {
                 }
             }
             .padding()
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(Color(NSColor.windowBackgroundColor))
+        }
+        .toolbar {
+            ToolbarItem(placement: .navigation) {
+                Button(action: {
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                        isSidebarVisible.toggle()
+                    }
+                }) {
+                    Image(systemName: "sidebar.left")
+                        .help("Toggle Sidebar")
+                }
+            }
         }
         .onChange(of: selectedSessionId) { newValue in
             if let sessionId = newValue {
