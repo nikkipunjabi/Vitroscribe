@@ -56,13 +56,17 @@ class MeetingJoinOverlayManager {
     }
     
     func close() {
-        guard let window = window else { return }
-        NSAnimationContext.runAnimationGroup { context in
-            context.duration = 0.5
-            window.animator().alphaValue = 0
-        } completionHandler: {
-            window.orderOut(nil)
-            self.window = nil
+        guard let existingWindow = window else { return }
+        // Nullify immediately to prevent multiple close animations
+        self.window = nil
+        
+        DispatchQueue.main.async {
+            NSAnimationContext.runAnimationGroup { context in
+                context.duration = 0.4
+                existingWindow.animator().alphaValue = 0
+            } completionHandler: {
+                existingWindow.orderOut(nil)
+            }
         }
     }
     
@@ -122,14 +126,17 @@ struct MeetingJoinPromptView: View {
                     
                     Spacer()
                     
-                    Button(action: onDismiss) {
+                    Button(action: {
+                        onDismiss()
+                    }) {
                         Image(systemName: "xmark.circle.fill")
-                            .foregroundColor(.secondary.opacity(0.5))
-                            .font(.system(size: 22))
+                            .foregroundColor(.secondary)
+                            .font(.system(size: 20))
                     }
                     .buttonStyle(.plain)
-                    .padding(.top, -10) // Align better with header
+                    .padding(.top, -15)
                     .padding(.trailing, -5)
+                    .help("Dismiss Notification")
                 }
                 
                 HStack(spacing: 12) {
@@ -220,13 +227,19 @@ struct MeetingJoinPromptView: View {
                 )
         )
         .onReceive(timer) { _ in
-            if timeRemaining > 0 {
+            if timeRemaining > 1 {
                 timeRemaining -= 1
-                withAnimation {
+                withAnimation(.linear(duration: 1.0)) {
                     progress = Double(timeRemaining) / 15.0
                 }
-            } else {
-                onDismiss()
+            } else if timeRemaining == 1 {
+                // Final step to zero
+                timeRemaining = 0
+                progress = 0
+                // Brief delay before dismissal to show 0s
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    onDismiss()
+                }
             }
         }
     }
