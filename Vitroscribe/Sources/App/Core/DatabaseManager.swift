@@ -132,12 +132,23 @@ class DatabaseManager {
         let plannedEndTime: Date?
     }
     
-    func getAllSessionsMetadata() -> [SessionMetadata] {
+    func getSessionsMetadata(limit: Int? = nil, offset: Int = 0, searchText: String? = nil) -> [SessionMetadata] {
         guard let db = db else { return [] }
         var sessions: [SessionMetadata] = []
         do {
-            // Sort by createdAt descending
-            let query = transcriptsTable.select(sessionId, createdAt, title, plannedStartTime, plannedEndTime).order(createdAt.desc)
+            var query = transcriptsTable.select(sessionId, createdAt, title, plannedStartTime, plannedEndTime)
+            
+            if let search = searchText, !search.isEmpty {
+                let searchPattern = "%\(search)%"
+                query = query.filter(title.like(searchPattern) || text.like(searchPattern))
+            }
+            
+            query = query.order(createdAt.desc)
+            
+            if let l = limit {
+                query = query.limit(l, offset: offset)
+            }
+            
             for row in try db.prepare(query) {
                 let idValue = row[sessionId]
                 let createdDate = Date(timeIntervalSince1970: row[createdAt])
@@ -145,20 +156,22 @@ class DatabaseManager {
                 let startValue = row[plannedStartTime].map { Date(timeIntervalSince1970: $0) }
                 let endValue = row[plannedEndTime].map { Date(timeIntervalSince1970: $0) }
                 
-                if !sessions.contains(where: { $0.id == idValue }) {
-                    sessions.append(SessionMetadata(
-                        id: idValue,
-                        createdAt: createdDate,
-                        title: titleValue,
-                        plannedStartTime: startValue,
-                        plannedEndTime: endValue
-                    ))
-                }
+                sessions.append(SessionMetadata(
+                    id: idValue,
+                    createdAt: createdDate,
+                    title: titleValue,
+                    plannedStartTime: startValue,
+                    plannedEndTime: endValue
+                ))
             }
         } catch {
             Logger.shared.log("Failed to fetch session metadata: \(error.localizedDescription)")
         }
         return sessions
+    }
+    
+    func getAllSessionsMetadata() -> [SessionMetadata] {
+        return getSessionsMetadata()
     }
     
     func getAllSessions() -> [String] {
