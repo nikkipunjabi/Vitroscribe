@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vitroscribe | Autonomous, Privacy-First Meeting Transcription</title>
+    <meta name="description"
+        content="Vitroscribe is a macOS app that automatically detects, records, and transcribes your meetings locally on your device. Sync calendars and never miss a detail.">
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <style>
+        :root {
+            --bg-color: #050505;
+            --accent-purple: #8B5CF6;
+            --accent-blue: #3B82F6;
+            --text-primary: #FFFFFF;
+            --text-secondary: #94A3B8;
+            --glass-bg: rgba(255, 255, 255, 0.03);
+            --glass-border: rgba(255, 255, 255, 0.1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            overflow-x: hidden;
+            line-height: 1.6;
+        }
+
+        /* Hero Section */
+        .hero {
+            position: relative;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+            text-align: center;
+            background: radial-gradient(circle at top right, rgba(139, 92, 246, 0.15), transparent),
+                radial-gradient(circle at bottom left, rgba(59, 130, 246, 0.15), transparent);
+        }
+
+        .hero-background {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            opacity: 0.6;
+            background-image: url('');
+            background-size: cover;
+            background-position: center;
+            filter: blur(2px);
+        }
+
+        .hero-content {
+            max-width: 900px;
+            z-index: 10;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .app-icon {
+            width: 120px;
+            height: 120px;
+            margin-bottom: 2rem;
+            border-radius: 28px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+            animation: float 6s ease-in-out infinite;
+        }
+
+        @keyframes float {
+
+            0%,
+            100% {
+                transform: translateY(0);
+            }
+
+            50% {
+                transform: translateY(-10px);
+            }
+        }
+
+        h1 {
+            font-size: clamp(2.5rem, 8vw, 5rem);
+            font-weight: 800;
+            letter-spacing: -0.02em;
+            margin-bottom: 1.5rem;
+            background: linear-gradient(135deg, #fff 30%, #a78bfa 100%);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .tagline {
+            font-size: clamp(1.1rem, 3vw, 1.5rem);
+            color: var(--text-secondary);
+            margin-bottom: 3rem;
+            max-width: 700px;
+            margin-inline: auto;
+        }
+
+        .cta-group {
+            display: flex;
+            gap: 1.5rem;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 1rem 2rem;
+            border-radius: 12px;
+            font-weight: 600;
+            text-decoration: none;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--accent-purple), var(--accent-blue));
+            color: white;
+            box-shadow: 0 4px 15px rgba(139, 92, 246, 0.4);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(139, 92, 246, 0.5);
+        }
+
+        .btn-secondary {
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            color: white;
+            backdrop-filter: blur(10px);
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.08);
+            transform: translateY(-2px);
+        }
+
+        /* Features Section */
+        .features {
+            padding: 8rem 2rem;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .section-title {
+            text-align: center;
+            margin-bottom: 5rem;
+        }
+
+        .section-title h2 {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+        }
+
+        .feature-card {
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            padding: 2.5rem;
+            border-radius: 24px;
+            backdrop-filter: blur(10px);
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .feature-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, rgba(139, 92, 246, 0.1), transparent);
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .feature-card:hover {
+            transform: translateY(-5px);
+            border-color: rgba(139, 92, 246, 0.3);
+        }
+
+        .feature-card:hover::before {
+            opacity: 1;
+        }
+
+        .feature-icon {
+            width: 50px;
+            height: 50px;
+            background: rgba(139, 92, 246, 0.1);
+            color: var(--accent-purple);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .feature-card h3 {
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .feature-card p {
+            color: var(--text-secondary);
+        }
+
+        /* Privacy Policy & Terms Links */
+        .footer {
+            padding: 4rem 2rem;
+            text-align: center;
+            border-top: 1px solid var(--glass-border);
+            background: rgba(0, 0, 0, 0.5);
+        }
+
+        .footer-links {
+            display: flex;
+            justify-content: center;
+            gap: 2rem;
+            margin-bottom: 2rem;
+        }
+
+        .footer-links a {
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 0.9rem;
+            transition: color 0.3s;
+        }
+
+        .footer-links a:hover {
+            color: var(--accent-purple);
+        }
+
+        .copyright {
+            color: var(--text-secondary);
+            font-size: 0.8rem;
+            opacity: 0.6;
+        }
+
+        /* Verification Info */
+        .verification-badge {
+            display: inline-block;
+            padding: 0.5rem 1rem;
+            background: rgba(59, 130, 246, 0.1);
+            color: var(--accent-blue);
+            border-radius: 50px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            margin-bottom: 1.5rem;
+            border: 1px solid rgba(59, 130, 246, 0.2);
+        }
+
+        @media (max-width: 768px) {
+            .hero {
+                padding: 4rem 1rem;
+            }
+
+            h1 {
+                font-size: 3rem;
+            }
+
+            .feature-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <section class="hero">
+        <div class="hero-background"></div>
+        <div class="hero-content">
+            <img src="https://nikkipunjabi.com/vitroscribe/vitroscribe_logo.png" alt="Vitroscribe App Icon"
+                class="app-icon">
+            <span class="verification-badge">✨ Now in Public Beta</span>
+            <h1>Vitroscribe</h1>
+            <p class="tagline">The autonomous, privacy-first macOS scribe. Automatically detect, record, and transcribe
+                meetings with 100% on-device processing.</p>
+
+            <div class="cta-group">
+                <a target="_blank" href="https://nikkipunjabi.com/vitroscribe/vitroscribe.dmg" class="btn btn-primary">
+                    <i data-lucide="download"></i> Download for macOS
+                </a>
+                <a href="#features" class="btn btn-secondary">Explore Features</a>
+            </div>
+        </div>
+    </section>
+
+    <section id="features" class="features">
+        <div class="section-title">
+            <h2>Workflow Redefined</h2>
+            <p style="color: var(--text-secondary);">Everything you need to capture knowledge without lifting a finger.
+            </p>
+        </div>
+
+        <div class="feature-grid">
+            <div class="feature-card">
+                <div class="feature-icon"><i data-lucide="shield-check"></i></div>
+                <h3>100% On-Device Privacy</h3>
+                <p>No audio or text data ever leaves your Mac. Vitroscribe uses Apple's native SFSpeechRecognizer for
+                    secure, offline transcription.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon"><i data-lucide="calendar"></i></div>
+                <h3>Smart Calendar Sync</h3>
+                <p>Connect Google Calendar and Outlook to automatically fetch meeting links. Join and start recording
+                    with a single click from the HUD.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon"><i data-lucide="zap"></i></div>
+                <h3>Autonomous Detection</h3>
+                <p>Vitroscribe automatically spots when you join a Zoom, Google Meet, or Microsoft Teams call and starts
+                    the transcription engine instantly.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon"><i data-lucide="search"></i></div>
+                <h3>Global Search & History</h3>
+                <p>Instantly find specific transcripts by searching through titles or content. Your entire meeting
+                    archive is available at your fingertips.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon"><i data-lucide="layout"></i></div>
+                <h3>Premium Join HUD</h3>
+                <p>A sleek floating notification appears before your meetings, offering a "Join & Capture" action to
+                    streamline your entry into the call.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon"><i data-lucide="clock"></i></div>
+                <h3>Infinite Timeline</h3>
+                <p>Precise audio stitching ensures zero word-loss, even during network stutters or application switches.
+                </p>
+            </div>
+        </div>
+    </section>
+
+    <footer class="footer">
+        <div class="footer-links">
+            <a href="https://nikkipunjabi.com/vitroscribe/privacy.html">Privacy Policy</a>
+            <a href="https://nikkipunjabi.com/vitroscribe/terms.html">Terms of Service</a>
+            <a href="mailto:nikki.punjabi@gmail.com">Support</a>
+        </div>
+        <p class="copyright">© 2026 Vitroscribe. Built for macOS. All rights reserved.</p>
+        <div style="margin-top: 2rem; font-size: 0.8rem; color: var(--text-secondary);">
+            App Name: Vitroscribe | Developer: Nikki Punjabi
+        </div>
+    </footer>
+
+    <script>
+        // Initialize Lucide icons
+        lucide.createIcons();
+
+        // Simple scroll reveal
+        const observerOptions = {
+            threshold: 0.1
+        };
+
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.style.opacity = '1';
+                    entry.target.style.transform = 'translateY(0)';
+                }
+            });
+        }, observerOptions);
+
+        document.querySelectorAll('.feature-card').forEach(card => {
+            card.style.opacity = '0';
+            card.style.transform = 'translateY(20px)';
+            card.style.transition = 'all 0.6s cubic-bezier(0.23, 1, 0.32, 1)';
+            observer.observe(card);
+        });
+    </script>
+</body>
+
+</html>
