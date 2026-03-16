@@ -22,13 +22,25 @@ class PromptOverlayWindow: NSPanel {
         self.ignoresMouseEvents = false
         self.animationBehavior = .utilityWindow
         
+        updatePrivacySetting()
+        
         if let screen = NSScreen.main {
             let x = screen.visibleFrame.maxX - 370
             let y = screen.visibleFrame.maxY - 140
             self.setFrameOrigin(NSPoint(x: x, y: y))
         }
         
+        
         self.contentView = NSHostingView(rootView: PromptOverlayView(detectedTitle: PromptOverlayManager.shared.detectedTitle))
+    }
+    
+    func updatePrivacySetting() {
+        let isShared = AudioEngineManager.shared.isPromptOverlayShared
+        if isShared {
+            self.sharingType = .readOnly
+        } else {
+            self.sharingType = .none
+        }
     }
 }
 
@@ -122,6 +134,12 @@ class PromptOverlayManager: ObservableObject {
             }, completionHandler: {
                 self.window?.orderOut(nil)
             })
+        }
+    }
+    
+    func updatePrivacySetting() {
+        DispatchQueue.main.async {
+            self.window?.updatePrivacySetting()
         }
     }
 }

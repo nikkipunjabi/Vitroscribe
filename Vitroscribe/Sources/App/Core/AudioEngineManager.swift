@@ -43,6 +43,13 @@ class AudioEngineManager: NSObject, ObservableObject {
         }
     }
     
+    @Published var isPromptOverlayShared: Bool = (UserDefaults.standard.object(forKey: "isPromptOverlayShared") as? Bool) ?? true {
+        didSet {
+            UserDefaults.standard.set(isPromptOverlayShared, forKey: "isPromptOverlayShared")
+            PromptOverlayManager.shared.updatePrivacySetting()
+        }
+    }
+    
     override private init() {
         super.init()
         checkPermissions()

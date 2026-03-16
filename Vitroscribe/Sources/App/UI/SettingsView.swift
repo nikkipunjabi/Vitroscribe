@@ -46,6 +46,9 @@ struct SettingsView: View {
                     
                     Toggle("Show 'Join Meeting' HUD on Screen Share", isOn: $audioManager.isJoinPromptShared)
                         .help("If disabled, the meeting join prompt will be invisible to others during your screen share.")
+                    
+                    Toggle("Show 'Meeting Detected' Popup on Screen Share", isOn: $audioManager.isPromptOverlayShared)
+                        .help("If disabled, the 'Meeting Detected' prompt will be invisible to others during your screen share.")
                 }
                 .padding()
                 .background(Color.secondary.opacity(0.1))

@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>BuildMachineOSBuild</key>
+	<string>25C56</string>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>en</string>
+	<key>CFBundleDisplayName</key>
+	<string>Vitroscribe</string>
+	<key>CFBundleExecutable</key>
+	<string>Vitroscribe</string>
+	<key>CFBundleIconFile</key>
+	<string>AppIcon</string>
+	<key>CFBundleIconName</key>
+	<string>AppIcon</string>
+	<key>CFBundleIdentifier</key>
+	<string>com.gravitas.Vitroscribe</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>Vitroscribe</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>1.0</string>
+	<key>CFBundleSupportedPlatforms</key>
+	<array>
+		<string>MacOSX</string>
+	</array>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>Microsoft Auth</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>msauth.com.gravitas.Vitroscribe</string>
+			</array>
+		</dict>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>Google Auth</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.googleusercontent.apps.482650596028-2oajhd8h2qkp66enum04798af8p7ersa</string>
+			</array>
+		</dict>
+	</array>
+	<key>CFBundleVersion</key>
+	<string>1</string>
+	<key>DTCompiler</key>
+	<string>com.apple.compilers.llvm.clang.1_0</string>
+	<key>DTPlatformBuild</key>
+	<string>25C58</string>
+	<key>DTPlatformName</key>
+	<string>macosx</string>
+	<key>DTPlatformVersion</key>
+	<string>26.2</string>
+	<key>DTSDKBuild</key>
+	<string>25C58</string>
+	<key>DTSDKName</key>
+	<string>macosx26.2</string>
+	<key>DTXcode</key>
+	<string>2630</string>
+	<key>DTXcodeBuild</key>
+	<string>17C529</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>14.0</string>
+	<key>NSAppleEventsUsageDescription</key>
+	<string>Vitroscribe needs to communicate with your browser to detect meeting URLs.</string>
+	<key>NSCalendarsUsageDescription</key>
+	<string>Vitroscribe needs calendar access to view scheduled meetings.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Vitroscribe requires microphone access to record meetings.</string>
+	<key>NSRemindersUsageDescription</key>
+	<string>Vitroscribe needs reminder access.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Vitroscribe requires speech recognition to transcribe meetings.</string>
+</dict>
+</plist>
