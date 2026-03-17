@@ -11,6 +11,7 @@ class AudioEngineManager: NSObject, ObservableObject {
     private var recognitionTask: SFSpeechRecognitionTask?
     
     @Published var currentTranscript: String = ""
+    @Published var activeSpeech: String = ""
     @Published var isRecording: Bool = false
     @Published var isManualRecording: Bool = false
     @Published var isAuthorized: Bool = false
@@ -23,12 +24,12 @@ class AudioEngineManager: NSObject, ObservableObject {
     private var sessionStartTime: Date?
     private var currentTaskStartTime: Date?
     private var syncTimer: Timer?
+    private var watchdogTimer: Timer?
     
     private var currentMeetingTitle: String?
     private var currentMeetingStartTime: Date?
     private var currentMeetingEndTime: Date?
     
-    @Published var activeSpeech: String = ""
     @Published var isOverlayShared: Bool = UserDefaults.standard.bool(forKey: "isOverlayShared") {
         didSet {
             UserDefaults.standard.set(isOverlayShared, forKey: "isOverlayShared")
@@ -125,6 +126,15 @@ class AudioEngineManager: NSObject, ObservableObject {
     }
     
     private func startRecognitionTask() {
+        // Watchdog: If a task runs for > 70s without finalizing, force restart it.
+        watchdogTimer?.invalidate()
+        watchdogTimer = Timer.scheduledTimer(withTimeInterval: 70.0, repeats: false) { [weak self] _ in
+            guard let self = self, self.isRecording && !self.isIntentionalStop else { return }
+            Logger.shared.log("Watchdog: Recognition task hung for > 70s. Force restarting...")
+            self.recognitionTask?.cancel()
+            self.startRecognitionTask()
+        }
+
         recognitionRequest = SFSpeechAudioBufferRecognitionRequest()
         guard let recognitionRequest = recognitionRequest else {
             fatalError("Unable to create an SFSpeechAudioBufferRecognitionRequest object")
@@ -143,13 +153,24 @@ class AudioEngineManager: NSObject, ObservableObject {
             guard let self = self else { return }
             if isTaskFinished { return }
             
+            if let error = error {
+                Logger.shared.log("Recognition task error: \(error.localizedDescription)")
+            }
+            
             if let result = result {
                 guard let sessionStart = self.sessionStartTime,
-                      let taskStart = self.currentTaskStartTime else { return }
+                      let taskStart = self.currentTaskStartTime else { 
+                    Logger.shared.log("Error: Missing session or task start time.")
+                    return 
+                }
                 
                 let taskOffset = taskStart.timeIntervalSince(sessionStart)
                 
                 // 1. Map every segment into the global Absolute Timeline
+                if result.bestTranscription.segments.isEmpty && !result.bestTranscription.formattedString.isEmpty {
+                    Logger.shared.log("Warning: Partial result has text but no segments.")
+                }
+
                 for segment in result.bestTranscription.segments {
                     let absoluteMs = Int((taskOffset + segment.timestamp) * 1000)
                     self.timelineLedger[absoluteMs] = segment.substring
@@ -162,17 +183,34 @@ class AudioEngineManager: NSObject, ObservableObject {
                     self.currentTranscript = fullText
                     self.activeSpeech = result.bestTranscription.formattedString
                 }
+                
+                if result.isFinal {
+                    Logger.shared.log("Recognition task finalized. Text length: \(result.bestTranscription.formattedString.count)")
+                }
             }
             
             if error != nil || (result?.isFinal ?? false) {
                 isTaskFinished = true
+                self.watchdogTimer?.invalidate()
+                self.watchdogTimer = nil
                 self.recognitionRequest = nil
                 self.recognitionTask = nil
                 
                 if !self.isIntentionalStop {
+                    Logger.shared.log("Restarting recognition task...")
                     self.startRecognitionTask() // Seamlessly stitch next 60s
                 } else {
                     self.shutDownEngine()
+                }
+            }
+        }
+        
+        if recognitionTask == nil {
+            Logger.shared.log("Failed to create recognition task. Speech recognizer might be unavailable.")
+            // Try to recover after a short delay
+            DispatchQueue.main.asyncAfter(deadline: .now() + 5.0) { [weak self] in
+                if self?.isRecording == true && !self!.isIntentionalStop {
+                    self?.startRecognitionTask()
                 }
             }
         }

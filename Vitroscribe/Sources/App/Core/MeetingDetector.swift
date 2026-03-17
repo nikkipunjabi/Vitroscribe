@@ -133,8 +133,9 @@ class MeetingDetector: ObservableObject {
                         self.consecutiveMisses += 1
                         
                         // If the Window/URL match is gone for 'missesRequiredToStop' checks, we stop.
-                        if !meetingFound && self.consecutiveMisses >= self.missesRequiredToStop {
-                            Logger.shared.log("Auto-Detect: Meeting ended (Context lost). Stopping recording.")
+                        // v11.3: Increased to 15 misses (30 seconds) to be more robust against temporary context loss.
+                        if !meetingFound && self.consecutiveMisses >= 15 {
+                            Logger.shared.log("Auto-Detect: Meeting ended (Context lost after 30s). Stopping recording.")
                             self.isMeetingActive = false
                             self.consecutiveMisses = 0
                             audioManager.stopRecording()
