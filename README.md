@@ -6,8 +6,8 @@
 
 ## ✨ Key Features
 
-- **🤖 Whisper-Powered Transcription** — Powered by OpenAI's Whisper model (`small.en`) via WhisperKit, the same engine behind MacWhisper. Captures every word spoken in a meeting with high accuracy, including accents, fast speech, and overlapping dialogue.
-- **🔒 100% On-Device & Private** — All transcription runs locally via Apple Core ML. No audio, no text, and no metadata ever leaves your Mac. The model is downloaded once (~465 MB) and cached permanently.
+- **🤖 Whisper-Powered Transcription** — Powered by OpenAI's Whisper `small` multilingual model via WhisperKit, the same engine behind MacWhisper. Captures every word spoken in a meeting with high accuracy, including accents, fast speech, and overlapping dialogue. Supports 99+ languages including English, Hindi, Urdu, and more.
+- **🔒 100% On-Device & Private** — All transcription runs locally via Apple Core ML. No audio, no text, and no metadata ever leaves your Mac. The model is downloaded once (~490 MB) and cached permanently in Application Support.
 - **⚡️ Smart Meeting Link Discovery** — Scans calendar event descriptions, locations, and bodies for Google Meet, Zoom, and Teams links automatically.
 - **🚀 Meeting Join HUD** — One minute before a scheduled meeting, a floating HUD appears with a 15-second countdown and a **"Join & Capture"** button to open the call and start transcription in one tap.
 - **🤖 Context-Aware Ad-hoc Tracking** — For unplanned calls, Vitroscribe captures the meeting window title (e.g., "Project Sync (Zoom)") to label transcriptions instantly.
@@ -28,7 +28,7 @@
 | Layer             | Technology                                                     |
 | ----------------- | -------------------------------------------------------------- |
 | UI                | SwiftUI — declarative, spring-animated, sidebar transitions    |
-| Transcription     | WhisperKit + Apple Core ML (`openai_whisper-small.en`)         |
+| Transcription     | WhisperKit + Apple Core ML (`openai_whisper-small`, multilingual) |
 | Audio Capture     | AVAudioEngine — 16 kHz mono float32 pipeline                   |
 | Calendar Auth     | OAuth2 PKCE — MS Graph & Google API                            |
 | Persistence       | SQLite.swift — local database with automated schema migrations |
@@ -48,7 +48,9 @@ When a meeting starts, audio is captured via AVAudioEngine and converted to 16 k
 
 **Catch-up guarantee:** if Whisper takes 5–6 seconds to process a chunk, any audio that arrived during that window is transcribed immediately when the run finishes, not at the next 25-second tick.
 
-**Stop guarantee:** when recording is stopped, Vitroscribe waits for any in-flight transcription to complete, then does a final pass on whatever is left in the buffer before saving — so the last words of every meeting are always captured.
+**Stop guarantee:** when recording is stopped, the UI responds instantly. Vitroscribe then waits up to 30 seconds for any in-flight transcription to complete, does a final pass on the remaining buffer, and saves — so the last words of every meeting are always captured.
+
+**Hallucination filtering:** Whisper occasionally emits meta-tokens such as `[BLANK_AUDIO]`, `(silence)`, or `[SPEAKING JAPANESE]`. Vitroscribe strips all `[…]` and `(…)` tokens — including split word fragments — before they reach the transcript. Consecutive duplicate words caused by Whisper's repetition loops or overlap boundaries are also removed automatically.
 
 ### 3. The History Vault
 
@@ -77,7 +79,7 @@ xcodegen generate
 open Vitroscribe.xcodeproj
 ```
 
-Build and run. On first launch, Vitroscribe downloads the Whisper model (~465 MB) in the background — a one-time operation. A banner in the app shows progress.
+Build and run. On first launch, Vitroscribe downloads the Whisper multilingual model (~490 MB) in the background — a one-time operation. A banner in the app shows progress. The model is cached in `~/Library/Application Support/com.gravitas.Vitroscribe/WhisperModels` and reused on every subsequent launch.
 
 ### Audio Setup
 
