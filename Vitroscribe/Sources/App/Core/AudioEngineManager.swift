@@ -142,7 +142,11 @@ class AudioEngineManager: NSObject, ObservableObject {
         let needsDownload = !FileManager.default.fileExists(atPath: whisperModelPath.path)
         Logger.shared.log("WhisperKit: starting load – model='\(whisperModel)' needsDownload=\(needsDownload) path=\(whisperModelPath.path)")
         await MainActor.run {
-            if needsDownload { self.isModelLoading = true }
+            if needsDownload {
+                self.isModelLoading = true     // shows download banner
+            } else {
+                self.isModelPrewarming = true  // hides "unavailable" during silent 8-9s load
+            }
         }
         let t0 = Date()
         do {

@@ -86,6 +86,23 @@ struct ContentView: View {
                     .padding(.bottom, 4)
                 }
 
+                // Silent model initialisation — shown for ~8s on every launch while
+                // WhisperKit loads the model from disk. Prevents "unavailable" flash.
+                if audioManager.isModelPrewarming {
+                    HStack(spacing: 12) {
+                        ProgressView().scaleEffect(0.75)
+                        Text("Loading transcription engine…")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                        Spacer()
+                    }
+                    .padding(12)
+                    .background(Color.secondary.opacity(0.07))
+                    .cornerRadius(10)
+                    .padding(.horizontal)
+                    .padding(.bottom, 4)
+                }
+
 
                 // Screen-recording permission warning
                 if !meetingDetector.isScreenRecordingAuthorized {
