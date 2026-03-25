@@ -73,7 +73,7 @@ struct ContentView: View {
                             Text("Loading AI Transcription Engine")
                                 .fontWeight(.semibold)
                                 .font(.subheadline)
-                            Text("Downloading Whisper multilingual model (~490 MB). One-time download — runs fully on-device after this.")
+                            Text("Downloading Whisper large-v3 turbo model (~1.6 GB). One-time download — runs fully on-device after this.")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                         }
