@@ -15,7 +15,7 @@
 	<key>CFBundleIconName</key>
 	<string>AppIcon</string>
 	<key>CFBundleIdentifier</key>
-	<string>com.gravitas.Vitroscribe</string>
+	<string>com.nikkipunjabi.Vitroscribe</string>
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
@@ -35,7 +35,7 @@
 			<string>Microsoft Auth</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
-				<string>msauth.com.gravitas.Vitroscribe</string>
+				<string>msauth.com.nikkipunjabi.Vitroscribe</string>
 			</array>
 		</dict>
 		<dict>

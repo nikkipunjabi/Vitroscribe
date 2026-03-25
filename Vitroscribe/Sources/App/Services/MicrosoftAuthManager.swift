@@ -8,7 +8,7 @@ class MicrosoftAuthManager: NSObject, ObservableObject, ASWebAuthenticationPrese
     
     private let clientId = "a5529ce5-c494-4775-b5e5-3b7700e47677"
     private let clientSecret = "_IT8Q~rPTsz56i23EEup0aLdiDnV3V3Y68xLdaVd"
-    private let redirectURI = "msauth.com.gravitas.Vitroscribe://auth"
+    private let redirectURI = "msauth.com.nikkipunjabi.Vitroscribe://auth"
     private let tenant = "common"
     
     @Published var isConnected: Bool = false
@@ -59,7 +59,7 @@ class MicrosoftAuthManager: NSObject, ObservableObject, ASWebAuthenticationPrese
             return 
         }
         
-        let session = ASWebAuthenticationSession(url: authURL, callbackURLScheme: "msauth.com.gravitas.Vitroscribe") { callbackURL, error in
+        let session = ASWebAuthenticationSession(url: authURL, callbackURLScheme: "msauth.com.nikkipunjabi.Vitroscribe") { callbackURL, error in
             if let error = error {
                 Logger.shared.log("Microsoft Auth error: \(error.localizedDescription)")
                 return

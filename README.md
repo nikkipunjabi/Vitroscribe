@@ -79,7 +79,7 @@ xcodegen generate
 open Vitroscribe.xcodeproj
 ```
 
-Build and run. On first launch, Vitroscribe downloads the Whisper multilingual model (~490 MB) in the background — a one-time operation. A banner in the app shows progress. The model is cached in `~/Library/Application Support/com.gravitas.Vitroscribe/WhisperModels` and reused on every subsequent launch.
+Build and run. On first launch, Vitroscribe downloads the Whisper multilingual model (~490 MB) in the background — a one-time operation. A banner in the app shows progress. The model is cached in `~/Library/Application Support/com.nikkipunjabi.Vitroscribe/WhisperModels` and reused on every subsequent launch.
 
 ### Audio Setup
 

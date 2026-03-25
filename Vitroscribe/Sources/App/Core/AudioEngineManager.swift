@@ -146,7 +146,7 @@ class AudioEngineManager: NSObject, ObservableObject {
     private var whisperDownloadBase: URL {
         let appSupport = FileManager.default
             .urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("com.gravitas.Vitroscribe/WhisperModels")
+            .appendingPathComponent("com.nikkipunjabi.Vitroscribe/WhisperModels")
         try? FileManager.default.createDirectory(at: appSupport, withIntermediateDirectories: true)
         return appSupport
     }
