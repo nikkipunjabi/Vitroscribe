@@ -142,10 +142,14 @@ class AudioEngineManager: NSObject, ObservableObject {
             await MainActor.run { isModelLoading = true }
         }
         do {
+            // prewarm: true compiles the Core ML models for this hardware immediately
+            // after download, so the very first transcribe() call is not blocked
+            // by JIT compilation (which can take several minutes).
             let pipe = try await WhisperKit(
                 model: whisperModel,
                 downloadBase: whisperDownloadBase,
-                verbose: false
+                verbose: false,
+                prewarm: true
             )
             await MainActor.run {
                 self.whisperKit     = pipe
@@ -392,7 +396,21 @@ class AudioEngineManager: NSObject, ObservableObject {
                 noSpeechThreshold: 0.3
             )
 
-            let results = try await whisper.transcribe(audioArray: samples, decodeOptions: options)
+            // Run transcription with a 90-second timeout so the app can never
+            // hang permanently if Core ML stalls on this hardware.
+            let transcriptionTask = Task { try await whisper.transcribe(audioArray: samples, decodeOptions: options) }
+            let timeoutTask = Task {
+                try await Task.sleep(nanoseconds: 90_000_000_000)
+                transcriptionTask.cancel()
+            }
+            let results: [TranscriptionResult]
+            do {
+                results = try await transcriptionTask.value
+                timeoutTask.cancel()
+            } catch {
+                timeoutTask.cancel()
+                throw error   // falls through to the outer catch
+            }
 
             await MainActor.run { [weak self] in
                 guard let self = self else { return }
