@@ -34,6 +34,8 @@ targets:
     dependencies:
       - package: SQLite.swift
         product: SQLite
+      - package: WhisperKit
+        product: WhisperKit
     settings:
       CODE_SIGN_IDENTITY: "-"
       CODE_SIGN_STYLE: Automatic
@@ -44,3 +46,6 @@ packages:
   SQLite.swift:
     url: https://github.com/stephencelis/SQLite.swift.git
     from: 0.15.3
+  WhisperKit:
+    url: https://github.com/argmaxinc/WhisperKit.git
+    from: 0.9.0
