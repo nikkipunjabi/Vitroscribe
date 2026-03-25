@@ -38,7 +38,7 @@ class AudioEngineManager: NSObject, ObservableObject {
     // MARK: Whisper
     private var whisperKit: WhisperKit?
     // Multilingual model — supports English, Hindi, Urdu, and 98 other languages.
-    private let whisperModel = "openai_whisper-large-v3_turbo"
+    private let whisperModel = "openai_whisper-small"
     private let whisperSampleRate: Double = 16_000
 
     // MARK: Whisper hallucination suppression
