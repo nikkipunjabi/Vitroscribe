@@ -1,230 +1,442 @@
 import Foundation
-import Speech
 import AVFoundation
+import WhisperKit
+
+// MARK: - AudioEngineManager
+//
+// Transcription engine powered by OpenAI Whisper (via WhisperKit).
+//
+// Audio pipeline:
+//   AVAudioEngine tap → 16 kHz mono float32 conversion → audioSamples buffer
+//   Every 25 s the buffer is passed to WhisperKit for transcription.
+//
+// Zero-gap guarantee:
+//   • When a transcription finishes, any audio that accumulated during
+//     the processing window is immediately queued for the next run.
+//   • stopRecording() waits for any in-flight transcription to finish,
+//     then does one final transcription of the remaining buffer before
+//     shutting down, so nothing is ever silently discarded.
 
 class AudioEngineManager: NSObject, ObservableObject {
     static let shared = AudioEngineManager()
-    
-    private let engine = AVAudioEngine()
-    private let speechRecognizer = SFSpeechRecognizer(locale: Locale(identifier: "en-US"))!
-    private var recognitionRequest: SFSpeechAudioBufferRecognitionRequest?
-    private var recognitionTask: SFSpeechRecognitionTask?
-    
+
+    // MARK: Published state
     @Published var currentTranscript: String = ""
     @Published var activeSpeech: String = ""
     @Published var isRecording: Bool = false
     @Published var isManualRecording: Bool = false
     @Published var isAuthorized: Bool = false
-    
+    @Published var isModelLoading: Bool = false
+    @Published var isModelReady: Bool = false
+    @Published var isTranscribing: Bool = false
+
+    // MARK: Audio engine
+    private let engine = AVAudioEngine()
+    private var audioConverter: AVAudioConverter?
+
+    // MARK: Whisper
+    private var whisperKit: WhisperKit?
+    private let whisperModel = "openai_whisper-small.en"
+    private let whisperSampleRate: Double = 16_000
+
+    // MARK: Whisper hallucination tokens to suppress
+    private let suppressedTokens: Set<String> = [
+        "[BLANK_AUDIO]", "[blank_audio]",
+        "[MUSIC]", "[music]",
+        "[APPLAUSE]", "[applause]",
+        "[NOISE]", "[noise]",
+        "[silence]", "[Silence]",
+        "(blank audio)", "(silence)"
+    ]
+
+    // MARK: Audio accumulation
+    // All access to audioSamples is serialised through audioQueue.
+    private let audioQueue = DispatchQueue(label: "com.vitroscribe.audio", qos: .userInitiated)
+    private var audioSamples: [Float] = []
+    private let chunkDuration: Double = 25.0
+    private let overlapDuration: Double = 2.0
+    // Minimum accumulated audio before triggering a catch-up transcription.
+    private let catchUpThreshold: Double = 3.0   // seconds
+    private var chunkTimer: Timer?
+
+    // MARK: Session metadata
     private var currentSessionId: String = ""
     private var isIntentionalStop = false
-    
-    // V11.2 Infinite Timeline Matrix (Absolute Addressing)
-    private var timelineLedger: [Int: String] = [:] // Absolute Ms -> Word
-    private var sessionStartTime: Date?
-    private var currentTaskStartTime: Date?
+    private var sessionStartDate: Date?
+    private var currentChunkStartDate: Date?
+    private var timelineLedger: [Int: String] = [:]
     private var syncTimer: Timer?
-    private var watchdogTimer: Timer?
-    
+
     private var currentMeetingTitle: String?
     private var currentMeetingStartTime: Date?
     private var currentMeetingEndTime: Date?
-    
+
+    // MARK: Settings
     @Published var isOverlayShared: Bool = UserDefaults.standard.bool(forKey: "isOverlayShared") {
         didSet {
             UserDefaults.standard.set(isOverlayShared, forKey: "isOverlayShared")
             RecordingOverlayManager.shared.updatePrivacySetting()
         }
     }
-    
+
     @Published var isJoinPromptShared: Bool = (UserDefaults.standard.object(forKey: "isJoinPromptShared") as? Bool) ?? true {
         didSet {
             UserDefaults.standard.set(isJoinPromptShared, forKey: "isJoinPromptShared")
             MeetingJoinOverlayManager.shared.updatePrivacySetting()
         }
     }
-    
+
     @Published var isPromptOverlayShared: Bool = (UserDefaults.standard.object(forKey: "isPromptOverlayShared") as? Bool) ?? true {
         didSet {
             UserDefaults.standard.set(isPromptOverlayShared, forKey: "isPromptOverlayShared")
             PromptOverlayManager.shared.updatePrivacySetting()
         }
     }
-    
+
+    // MARK: - Init
+
     override private init() {
         super.init()
         checkPermissions()
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleEngineConfigChange),
+            name: .AVAudioEngineConfigurationChange,
+            object: engine)
+        Task { await loadWhisperModel() }
     }
-    
+
+    // MARK: - Whisper model loading
+
+    /// Persistent folder where the Whisper model is stored between launches.
+    /// WhisperKit downloads into <downloadBase>/argmaxinc/whisperkit-coreml/<model>/
+    private var whisperDownloadBase: URL {
+        let appSupport = FileManager.default
+            .urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("com.gravitas.Vitroscribe/WhisperModels")
+        try? FileManager.default.createDirectory(at: appSupport, withIntermediateDirectories: true)
+        return appSupport
+    }
+
+    /// The exact folder WhisperKit writes the model files into.
+    private var whisperModelPath: URL {
+        whisperDownloadBase
+            .appendingPathComponent("argmaxinc/whisperkit-coreml")
+            .appendingPathComponent(whisperModel)
+    }
+
+    private func loadWhisperModel() async {
+        // Only show the banner when the model files aren't on disk yet.
+        let needsDownload = !FileManager.default.fileExists(atPath: whisperModelPath.path)
+        if needsDownload {
+            await MainActor.run { isModelLoading = true }
+        }
+        do {
+            let pipe = try await WhisperKit(
+                model: whisperModel,
+                downloadBase: whisperDownloadBase,
+                verbose: false
+            )
+            await MainActor.run {
+                self.whisperKit     = pipe
+                self.isModelLoading = false
+                self.isModelReady   = true
+                Logger.shared.log("WhisperKit: model '\(self.whisperModel)' ready.")
+            }
+        } catch {
+            await MainActor.run {
+                self.isModelLoading = false
+                Logger.shared.log("WhisperKit: failed to load – \(error.localizedDescription)")
+            }
+        }
+    }
+
+    // MARK: - Permissions
+
     func checkPermissions() {
-        SFSpeechRecognizer.requestAuthorization { authStatus in
-            DispatchQueue.main.async {
-                switch authStatus {
-                case .authorized:
-                    self.isAuthorized = true
-                    Logger.shared.log("Speech recognition authorized.")
-                case .denied, .restricted, .notDetermined:
-                    self.isAuthorized = false
-                    Logger.shared.log("Speech recognition not authorized.")
-                @unknown default:
-                    self.isAuthorized = false
-                }
-            }
-        }
-        
         AVCaptureDevice.requestAccess(for: .audio) { granted in
-            if granted {
-                Logger.shared.log("Microphone access granted.")
-            } else {
-                Logger.shared.log("Microphone access denied.")
+            DispatchQueue.main.async {
+                self.isAuthorized = granted
+                Logger.shared.log(granted ? "Microphone access granted." : "Microphone access denied.")
             }
         }
     }
-    
-    func startRecording(manual: Bool = false, title: String? = nil, startTime: Date? = nil, endTime: Date? = nil) {
+
+    // MARK: - Audio device change
+
+    @objc private func handleEngineConfigChange(_ notification: Notification) {
+        guard isRecording && !isIntentionalStop else { return }
+        Logger.shared.log("Audio engine config changed – re-installing tap.")
+        reinstallTap()
+        do { try engine.start() } catch {
+            Logger.shared.log("Failed to restart engine: \(error.localizedDescription)")
+        }
+    }
+
+    private func reinstallTap() {
+        engine.inputNode.removeTap(onBus: 0)
+        let fmt = engine.inputNode.outputFormat(forBus: 0)
+        setupConverter(inputFormat: fmt)
+        engine.inputNode.installTap(onBus: 0, bufferSize: 4096, format: fmt) { [weak self] buf, _ in
+            self?.appendAudioBuffer(buf)
+        }
+    }
+
+    // MARK: - Recording lifecycle
+
+    func startRecording(manual: Bool = false, title: String? = nil,
+                        startTime: Date? = nil, endTime: Date? = nil) {
         guard !isRecording else { return }
         guard isAuthorized else {
-            Logger.shared.log("Cannot start recording, not authorized.")
+            Logger.shared.log("Cannot start – microphone not authorised.")
             return
         }
-        
-        isIntentionalStop = false
-        currentSessionId = UUID().uuidString
-        currentTranscript = ""
-        timelineLedger = [:]
-        sessionStartTime = Date()
-        activeSpeech = ""
-        isRecording = true
-        self.isManualRecording = manual
-        self.currentMeetingTitle = title
-        self.currentMeetingStartTime = startTime
-        self.currentMeetingEndTime = endTime
-        
-        // 5-second database heartbeat (v11.2)
+        guard isModelReady, whisperKit != nil else {
+            Logger.shared.log("Cannot start – Whisper model not ready.")
+            return
+        }
+
+        isIntentionalStop        = false
+        currentSessionId         = UUID().uuidString
+        currentTranscript        = ""
+        activeSpeech             = ""
+        timelineLedger           = [:]
+        sessionStartDate         = Date()
+        currentChunkStartDate    = Date()
+        isRecording              = true
+        isManualRecording        = manual
+        currentMeetingTitle      = title
+        currentMeetingStartTime  = startTime
+        currentMeetingEndTime    = endTime
+
         syncTimer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { [weak self] _ in
             self?.syncLedgerToDatabase()
         }
-        
+
         do {
-            let inputNode = engine.inputNode
-            let recordingFormat = inputNode.outputFormat(forBus: 0)
-            
-            inputNode.installTap(onBus: 0, bufferSize: 4096, format: recordingFormat) { buffer, _ in
-                self.recognitionRequest?.append(buffer)
+            let fmt = engine.inputNode.outputFormat(forBus: 0)
+            setupConverter(inputFormat: fmt)
+            engine.inputNode.installTap(onBus: 0, bufferSize: 4096, format: fmt) { [weak self] buf, _ in
+                self?.appendAudioBuffer(buf)
             }
-            
             engine.prepare()
             try engine.start()
-            Logger.shared.log("Started recording with session ID: \(currentSessionId)")
-            
-            startRecognitionTask()
-            
+            Logger.shared.log("Recording started – session \(currentSessionId)")
+
+            // Transcribe every chunkDuration seconds (rolling timer).
+            chunkTimer = Timer.scheduledTimer(withTimeInterval: chunkDuration, repeats: true) { [weak self] _ in
+                self?.triggerChunkTranscription()
+            }
         } catch {
-            Logger.shared.log("Error starting audio engine: \(error.localizedDescription)")
-            shutDownEngine()
+            Logger.shared.log("Audio engine start failed: \(error.localizedDescription)")
+            finalizeStop()
         }
     }
-    
-    private func startRecognitionTask() {
-        // Watchdog: If a task runs for > 70s without finalizing, force restart it.
-        watchdogTimer?.invalidate()
-        watchdogTimer = Timer.scheduledTimer(withTimeInterval: 70.0, repeats: false) { [weak self] _ in
-            guard let self = self, self.isRecording && !self.isIntentionalStop else { return }
-            Logger.shared.log("Watchdog: Recognition task hung for > 70s. Force restarting...")
-            self.recognitionTask?.cancel()
-            self.startRecognitionTask()
-        }
 
-        recognitionRequest = SFSpeechAudioBufferRecognitionRequest()
-        guard let recognitionRequest = recognitionRequest else {
-            fatalError("Unable to create an SFSpeechAudioBufferRecognitionRequest object")
-        }
-        
-        currentTaskStartTime = Date()
-        recognitionRequest.shouldReportPartialResults = true
-        
-        if #available(macOS 13.0, *) {
-            recognitionRequest.requiresOnDeviceRecognition = true
-        }
-        
-        var isTaskFinished = false
-        
-        recognitionTask = speechRecognizer.recognitionTask(with: recognitionRequest) { [weak self] result, error in
+    /// Stops the engine capture and kicks off a final async transcription+save.
+    func stopRecording() {
+        guard isRecording else { return }
+        isIntentionalStop = true
+
+        // Kill the periodic timer and the capture tap so no more audio arrives.
+        chunkTimer?.invalidate(); chunkTimer = nil
+        engine.stop()
+        engine.inputNode.removeTap(onBus: 0)
+
+        // Async: wait for any in-flight transcription, transcribe remaining
+        // audio, then save and mark as stopped.
+        Task { [weak self] in
             guard let self = self else { return }
-            if isTaskFinished { return }
-            
-            if let error = error {
-                Logger.shared.log("Recognition task error: \(error.localizedDescription)")
-            }
-            
-            if let result = result {
-                guard let sessionStart = self.sessionStartTime,
-                      let taskStart = self.currentTaskStartTime else { 
-                    Logger.shared.log("Error: Missing session or task start time.")
-                    return 
-                }
-                
-                let taskOffset = taskStart.timeIntervalSince(sessionStart)
-                
-                // 1. Map every segment into the global Absolute Timeline
-                if result.bestTranscription.segments.isEmpty && !result.bestTranscription.formattedString.isEmpty {
-                    Logger.shared.log("Warning: Partial result has text but no segments.")
-                }
 
-                for segment in result.bestTranscription.segments {
-                    let absoluteMs = Int((taskOffset + segment.timestamp) * 1000)
-                    self.timelineLedger[absoluteMs] = segment.substring
-                }
-                
-                // 2. Reconstruct from Matrix (Math guarantees zero-duplication)
-                let fullText = self.reconstructFromLedger()
-                
-                DispatchQueue.main.async {
-                    self.currentTranscript = fullText
-                    self.activeSpeech = result.bestTranscription.formattedString
-                }
-                
-                if result.isFinal {
-                    Logger.shared.log("Recognition task finalized. Text length: \(result.bestTranscription.formattedString.count)")
-                }
+            // 1. Wait for any current transcription to finish.
+            while await MainActor.run(resultType: Bool.self) { self.isTranscribing } {
+                try? await Task.sleep(nanoseconds: 100_000_000)  // poll every 100 ms
             }
-            
-            if error != nil || (result?.isFinal ?? false) {
-                isTaskFinished = true
-                self.watchdogTimer?.invalidate()
-                self.watchdogTimer = nil
-                self.recognitionRequest = nil
-                self.recognitionTask = nil
-                
-                if !self.isIntentionalStop {
-                    Logger.shared.log("Restarting recognition task...")
-                    self.startRecognitionTask() // Seamlessly stitch next 60s
-                } else {
-                    self.shutDownEngine()
-                }
-            }
+
+            // 2. Transcribe whatever is left in the buffer.
+            await self.transcribeRemainingAudio()
+
+            // 3. Finalize.
+            await MainActor.run { self.finalizeStop() }
         }
-        
-        if recognitionTask == nil {
-            Logger.shared.log("Failed to create recognition task. Speech recognizer might be unavailable.")
-            // Try to recover after a short delay
-            DispatchQueue.main.asyncAfter(deadline: .now() + 5.0) { [weak self] in
-                if self?.isRecording == true && !self!.isIntentionalStop {
-                    self?.startRecognitionTask()
+    }
+
+    private func finalizeStop() {
+        guard isRecording || isIntentionalStop else { return }
+        isRecording       = false
+        isManualRecording = false
+        activeSpeech      = ""
+        isTranscribing    = false
+
+        syncTimer?.invalidate(); syncTimer = nil
+
+        // Engine may already be stopped; guard against double-stop.
+        if engine.isRunning { engine.stop() }
+
+        syncLedgerToDatabase()
+        Logger.shared.log("Recording stopped – session \(currentSessionId)")
+    }
+
+    // MARK: - Audio conversion & accumulation
+
+    private func setupConverter(inputFormat: AVAudioFormat) {
+        let out = AVAudioFormat(commonFormat: .pcmFormatFloat32,
+                                sampleRate: whisperSampleRate,
+                                channels: 1,
+                                interleaved: false)!
+        audioConverter = AVAudioConverter(from: inputFormat, to: out)
+    }
+
+    private func appendAudioBuffer(_ buffer: AVAudioPCMBuffer) {
+        guard let converter = audioConverter else { return }
+        let ratio    = whisperSampleRate / buffer.format.sampleRate
+        let capacity = AVAudioFrameCount(Double(buffer.frameLength) * ratio) + 1
+        guard let out = AVAudioPCMBuffer(pcmFormat: converter.outputFormat,
+                                         frameCapacity: capacity) else { return }
+        var done = false
+        converter.convert(to: out, error: nil) { _, status in
+            if done { status.pointee = .noDataNow; return nil }
+            done = true; status.pointee = .haveData; return buffer
+        }
+        guard let ch = out.floatChannelData?[0], out.frameLength > 0 else { return }
+        let samples = Array(UnsafeBufferPointer(start: ch, count: Int(out.frameLength)))
+        audioQueue.async { [weak self] in self?.audioSamples.append(contentsOf: samples) }
+    }
+
+    // MARK: - Chunk transcription
+
+    /// Called by the rolling timer every 25 seconds.
+    private func triggerChunkTranscription() {
+        // If a transcription is already running, skip this tick — the
+        // catch-up logic in `transcribe()` will handle accumulated audio
+        // as soon as the current run finishes.
+        guard !isTranscribing else { return }
+        runNextChunk()
+    }
+
+    /// Grabs current audio buffer and starts a transcription Task.
+    private func runNextChunk(minSeconds: Double = 0) {
+        var samples: [Float] = []
+        var chunkStart = Date()
+
+        audioQueue.sync { [self] in
+            guard !audioSamples.isEmpty else { return }
+            let secondsInBuffer = Double(audioSamples.count) / whisperSampleRate
+            guard secondsInBuffer >= minSeconds else { return }
+
+            samples    = audioSamples
+            chunkStart = currentChunkStartDate ?? sessionStartDate ?? Date()
+
+            // Keep a short overlap so boundary words are not cut off.
+            let overlapSamples = min(Int(overlapDuration * whisperSampleRate), audioSamples.count)
+            audioSamples           = Array(audioSamples.suffix(overlapSamples))
+            currentChunkStartDate  = Date().addingTimeInterval(-overlapDuration)
+        }
+
+        guard !samples.isEmpty else { return }
+
+        isTranscribing = true
+
+        let sessionStart       = sessionStartDate ?? Date()
+        let chunkOffsetSeconds = chunkStart.timeIntervalSince(sessionStart)
+
+        Task { [weak self] in
+            await self?.transcribe(samples: samples, chunkOffsetSeconds: chunkOffsetSeconds)
+        }
+    }
+
+    /// Transcribes any remaining audio when stopping.
+    private func transcribeRemainingAudio() async {
+        var samples: [Float] = []
+        var chunkStart = Date()
+
+        audioQueue.sync { [self] in
+            samples    = audioSamples
+            chunkStart = currentChunkStartDate ?? sessionStartDate ?? Date()
+            audioSamples = []
+        }
+
+        guard !samples.isEmpty, let sessionStart = sessionStartDate else { return }
+
+        await MainActor.run { self.isTranscribing = true }
+        let offset = chunkStart.timeIntervalSince(sessionStart)
+        await transcribe(samples: samples, chunkOffsetSeconds: offset)
+    }
+
+    // MARK: - Whisper transcription
+
+    private func transcribe(samples: [Float], chunkOffsetSeconds: Double) async {
+        guard let whisper = whisperKit else {
+            await MainActor.run { self.isTranscribing = false }
+            return
+        }
+
+        do {
+            let options = DecodingOptions(
+                task: .transcribe,
+                language: "en",
+                temperature: 0.0,
+                temperatureFallbackCount: 5,
+                wordTimestamps: true,
+                suppressBlank: true,
+                logProbThreshold: -1.0,
+                noSpeechThreshold: 0.3
+            )
+
+            let results = try await whisper.transcribe(audioArray: samples, decodeOptions: options)
+
+            await MainActor.run { [weak self] in
+                guard let self = self else { return }
+                self.mergeResults(results, chunkOffsetSeconds: chunkOffsetSeconds)
+                self.currentTranscript = self.reconstructFromLedger()
+                self.isTranscribing    = false
+                Logger.shared.log("Transcribed chunk at +\(Int(chunkOffsetSeconds))s – \(self.currentTranscript.count) chars total")
+
+                // ── Catch-up: if audio accumulated during processing, run immediately ──
+                // This is what closes the gap: instead of waiting up to 25 more seconds
+                // for the next timer tick, we process the backlogged audio right away.
+                if self.isRecording && !self.isIntentionalStop {
+                    self.runNextChunk(minSeconds: self.catchUpThreshold)
+                }
+            }
+        } catch {
+            Logger.shared.log("Transcription error: \(error.localizedDescription)")
+            await MainActor.run { self.isTranscribing = false }
+        }
+    }
+
+    // MARK: - Ledger
+
+    /// Map Whisper results into the absolute-millisecond timeline ledger.
+    private func mergeResults(_ results: [TranscriptionResult], chunkOffsetSeconds: Double) {
+        for result in results {
+            for segment in result.segments {
+                // Filter Whisper hallucination tokens (silence, music, etc.)
+                let segText = segment.text.trimmingCharacters(in: .whitespacesAndNewlines)
+                if segText.isEmpty || suppressedTokens.contains(segText) { continue }
+
+                if let words = segment.words, !words.isEmpty {
+                    for wordTiming in words {
+                        let text = wordTiming.word.trimmingCharacters(in: .whitespaces)
+                        if text.isEmpty || suppressedTokens.contains(text) { continue }
+                        let absMs = Int((chunkOffsetSeconds + Double(wordTiming.start)) * 1000)
+                        timelineLedger[absMs] = text
+                    }
+                } else {
+                    // No word timestamps — store the whole segment at its start time.
+                    let absMs = Int((chunkOffsetSeconds + Double(segment.start)) * 1000)
+                    timelineLedger[absMs] = segText
                 }
             }
         }
     }
-    
+
     private func reconstructFromLedger() -> String {
-        let sortedKeys = timelineLedger.keys.sorted()
-        var text = ""
-        var lastMs: Int = -1
-        
-        for ms in sortedKeys {
+        let sorted = timelineLedger.keys.sorted()
+        var text   = ""
+        var lastMs = -1
+        for ms in sorted {
             guard let word = timelineLedger[ms] else { continue }
-            
-            // Auto-Paragraphs for gaps > 2s
             if lastMs != -1 && (ms - lastMs) > 2000 {
                 text += "\n\n" + word
             } else {
@@ -234,48 +446,15 @@ class AudioEngineManager: NSObject, ObservableObject {
         }
         return text
     }
-    
+
     private func syncLedgerToDatabase() {
         let text = reconstructFromLedger()
-        if !text.isEmpty {
-            DatabaseManager.shared.saveOrUpdateSession(
-                sessionId: currentSessionId,
-                text: text,
-                title: currentMeetingTitle,
-                startTime: currentMeetingStartTime,
-                endTime: currentMeetingEndTime
-            )
-        }
-    }
-    
-    private func solidifyActiveSpeech() {
-        // Obsolete in v11.1 Matrix architecture
-    }
-    
-    func stopRecording() {
-        guard isRecording else { return }
-        isIntentionalStop = true
-        recognitionRequest?.endAudio()
-        shutDownEngine()
-    }
-    
-    private func shutDownEngine() {
-        guard isRecording else { return }
-        isRecording = false
-        isManualRecording = false
-        activeSpeech = ""
-        
-        syncTimer?.invalidate()
-        syncTimer = nil
-        
-        engine.stop()
-        engine.inputNode.removeTap(onBus: 0)
-        
-        recognitionTask?.cancel()
-        recognitionTask = nil
-        recognitionRequest = nil
-        
-        syncLedgerToDatabase()
-        Logger.shared.log("Stopped recording session ID: \(currentSessionId)")
+        guard !text.isEmpty else { return }
+        DatabaseManager.shared.saveOrUpdateSession(
+            sessionId: currentSessionId,
+            text: text,
+            title: currentMeetingTitle,
+            startTime: currentMeetingStartTime,
+            endTime: currentMeetingEndTime)
     }
 }

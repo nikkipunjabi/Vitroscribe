@@ -19,6 +19,7 @@
 		6E81776B1CF717A8153727D3 /* CalendarModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = EB8BD4D7EA817D2C70DA757B /* CalendarModels.swift */; };
 		6FD04C36F1D5E084AE456665 /* AudioEngineManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE8EFC47D042A14771E612C4 /* AudioEngineManager.swift */; };
 		72F09D9EB9DCC5C34DE82E54 /* MeetingJoinOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB5BEB48608D1CD9BE81A077 /* MeetingJoinOverlay.swift */; };
+		7857959348F22B3A7C4A9D90 /* WhisperKit in Frameworks */ = {isa = PBXBuildFile; productRef = 7E7DB8C8E7EC68E990555DA0 /* WhisperKit */; };
 		79429702740C485E808C5954 /* VitroscribeApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3973C76133B07DA5C539EB5 /* VitroscribeApp.swift */; };
 		932454ECB7333CC2CB6BCF88 /* AboutView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E9DAEA554B23FBF9C7E42527 /* AboutView.swift */; };
 		94FBF3CFDAA372B05906FA6B /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A3DD190A30052FA154B4D7AB /* Assets.xcassets */; };
@@ -62,6 +63,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				0C60F6605434198D366EA73A /* SQLite in Frameworks */,
+				7857959348F22B3A7C4A9D90 /* WhisperKit in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -179,6 +181,7 @@
 			name = Vitroscribe;
 			packageProductDependencies = (
 				63BF098A9252301A0E922532 /* SQLite */,
+				7E7DB8C8E7EC68E990555DA0 /* WhisperKit */,
 			);
 			productName = Vitroscribe;
 			productReference = B34F9C5F71D2C0F71936E412 /* Vitroscribe.app */;
@@ -210,6 +213,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				3B84E659C51733505993E0FF /* XCRemoteSwiftPackageReference "SQLite.swift" */,
+				25FB06991C4B803224E2C5DE /* XCRemoteSwiftPackageReference "WhisperKit" */,
 			);
 			preferredProjectObjectVersion = 77;
 			projectDirPath = "";
@@ -440,6 +444,14 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
+		25FB06991C4B803224E2C5DE /* XCRemoteSwiftPackageReference "WhisperKit" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/argmaxinc/WhisperKit.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.9.0;
+			};
+		};
 		3B84E659C51733505993E0FF /* XCRemoteSwiftPackageReference "SQLite.swift" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/stephencelis/SQLite.swift.git";
@@ -455,6 +467,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 3B84E659C51733505993E0FF /* XCRemoteSwiftPackageReference "SQLite.swift" */;
 			productName = SQLite;
+		};
+		7E7DB8C8E7EC68E990555DA0 /* WhisperKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 25FB06991C4B803224E2C5DE /* XCRemoteSwiftPackageReference "WhisperKit" */;
+			productName = WhisperKit;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

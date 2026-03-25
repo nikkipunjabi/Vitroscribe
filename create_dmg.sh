@@ -1,43 +1,55 @@
 #!/bin/bash
+# Builds Vitroscribe and packages it as a DMG using create-dmg (Sindre Sorhus).
+# This produces the canonical layout: app icon + chevron + Applications folder,
+# with the app's own icon used as the DMG volume icon.
+#
+# Usage: bash create_dmg.sh
+#
+# Requires:
+#   brew install create-dmg      (npm package: sindresorhus/create-dmg)
 
-# Configuration
+set -e
+
 APP_NAME="Vitroscribe"
-BUILD_DIR="build"
-APP_DIR="${BUILD_DIR}/Release/${APP_NAME}.app"
-DMG_NAME="${APP_NAME}.dmg"
+DERIVED="/tmp/vscribe_derived"
+RELEASE="release"
 
-echo "Building Xcode Project..."
-echo "Building Xcode Project..."
-xcodebuild -project ${APP_NAME}.xcodeproj -scheme ${APP_NAME} -configuration Release CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO -derivedDataPath derived_data
-if [ $? -ne 0 ]; then
-  echo "Build Failed! Check the errors above."
+echo "→ Building $APP_NAME (Release)..."
+xcodebuild \
+  -project "${APP_NAME}.xcodeproj" \
+  -scheme "${APP_NAME}" \
+  -configuration Release \
+  CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO \
+  -derivedDataPath "$DERIVED" \
+  | grep -E "(error:|warning:|BUILD SUCCEEDED|BUILD FAILED)" || true
+
+if [ ! -d "$DERIVED/Build/Products/Release/${APP_NAME}.app" ]; then
+  echo "✗ Build failed."
   exit 1
 fi
 
-echo "Copying to build directory..."
-mkdir -p build/Release
-cp -R derived_data/Build/Products/Release/${APP_NAME}.app build/Release/
+echo "→ Copying .app to release/..."
+mkdir -p "$RELEASE"
+rm -rf "$RELEASE/${APP_NAME}.app"
+cp -R "$DERIVED/Build/Products/Release/${APP_NAME}.app" "$RELEASE/"
 
-echo "Creating DMG..."
-# Check if create-dmg is installed, else use hdiutil
-if command -v create-dmg &> /dev/null; then
-  create-dmg \
-    --volname "${APP_NAME} Installer" \
-    --window-pos 200 120 \
-    --window-size 800 400 \
-    --icon-size 100 \
-    --icon "${APP_NAME}.app" 200 190 \
-    --hide-extension "${APP_NAME}.app" \
-    --app-drop-link 600 185 \
-    "${DMG_NAME}" \
-    "${APP_DIR}/"
-else
-  echo "create-dmg not found, using hdiutil"
-  hdiutil create -volname "${APP_NAME} Installer" -srcfolder "${APP_DIR}" -ov -format UDZO "${DMG_NAME}"
+echo "→ Creating DMG..."
+rm -f "$RELEASE/${APP_NAME}.dmg"
+
+create-dmg \
+  --overwrite \
+  --no-code-sign \
+  --dmg-title "$APP_NAME" \
+  "$RELEASE/${APP_NAME}.app" \
+  "$RELEASE/"
+
+# create-dmg names the file "AppName X.Y.dmg" — rename to canonical Vitroscribe.dmg
+VERSIONED=$(ls "$RELEASE/${APP_NAME} "*.dmg 2>/dev/null | head -1)
+if [ -n "$VERSIONED" ]; then
+  mv "$VERSIONED" "$RELEASE/${APP_NAME}.dmg"
 fi
 
-echo "Cleaning up..."
-rm -rf derived_data
-rm -rf build
+rm -rf "$DERIVED"
 
-echo "Done! Generated ${DMG_NAME}"
+echo "✓ Done: $RELEASE/${APP_NAME}.dmg"
+ls -lh "$RELEASE/${APP_NAME}.dmg"
