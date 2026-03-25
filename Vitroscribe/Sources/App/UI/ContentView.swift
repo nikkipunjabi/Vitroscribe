@@ -65,12 +65,12 @@ struct ContentView: View {
 
                 // ── Banners ───────────────────────────────────────────────────
 
-                // Whisper model loading banner (first launch)
+                // Whisper model downloading banner (first launch only)
                 if audioManager.isModelLoading {
                     HStack(spacing: 12) {
                         ProgressView().scaleEffect(0.75)
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("Loading AI Transcription Engine")
+                            Text("Downloading AI Transcription Engine")
                                 .fontWeight(.semibold)
                                 .font(.subheadline)
                             Text("Downloading Whisper large-v3 turbo model (~1.6 GB). One-time download — runs fully on-device after this.")
@@ -81,6 +81,27 @@ struct ContentView: View {
                     }
                     .padding(12)
                     .background(Color.blue.opacity(0.10))
+                    .cornerRadius(10)
+                    .padding(.horizontal)
+                    .padding(.bottom, 4)
+                }
+
+                // Whisper model prewarming banner (shown on every launch until model is compiled)
+                if audioManager.isModelPrewarming {
+                    HStack(spacing: 12) {
+                        ProgressView().scaleEffect(0.75)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Preparing AI Transcription Engine")
+                                .fontWeight(.semibold)
+                                .font(.subheadline)
+                            Text("Optimising model for your Mac. This takes a moment on first launch — won't happen again.")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        Spacer()
+                    }
+                    .padding(12)
+                    .background(Color.orange.opacity(0.10))
                     .cornerRadius(10)
                     .padding(.horizontal)
                     .padding(.bottom, 4)
@@ -121,7 +142,7 @@ struct ContentView: View {
                                     LiveEmptyStateView(
                                         isRecording: audioManager.isRecording,
                                         isModelReady: audioManager.isModelReady,
-                                        isModelLoading: audioManager.isModelLoading)
+                                        isModelLoading: audioManager.isModelLoading || audioManager.isModelPrewarming)
                                 } else {
                                     Text(audioManager.currentTranscript)
                                         .padding()

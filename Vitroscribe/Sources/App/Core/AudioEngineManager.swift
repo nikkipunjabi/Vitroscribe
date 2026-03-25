@@ -26,7 +26,8 @@ class AudioEngineManager: NSObject, ObservableObject {
     @Published var isRecording: Bool = false
     @Published var isManualRecording: Bool = false
     @Published var isAuthorized: Bool = false
-    @Published var isModelLoading: Bool = false
+    @Published var isModelLoading: Bool = false    // true = downloading
+    @Published var isModelPrewarming: Bool = false  // true = compiling Core ML for this hardware
     @Published var isModelReady: Bool = false
     @Published var isTranscribing: Bool = false
 
@@ -119,7 +120,7 @@ class AudioEngineManager: NSObject, ObservableObject {
     // MARK: - Whisper model loading
 
     /// Persistent folder where the Whisper model is stored between launches.
-    /// WhisperKit downloads into <downloadBase>/argmaxinc/whisperkit-coreml/<model>/
+    /// WhisperKit downloads into <downloadBase>/models/argmaxinc/whisperkit-coreml/<model>/
     private var whisperDownloadBase: URL {
         let appSupport = FileManager.default
             .urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
@@ -129,22 +130,26 @@ class AudioEngineManager: NSObject, ObservableObject {
     }
 
     /// The exact folder WhisperKit writes the model files into.
+    /// WhisperKit prepends "models/" to the downloadBase, so the real path is
+    /// <downloadBase>/models/argmaxinc/whisperkit-coreml/<model>/
     private var whisperModelPath: URL {
         whisperDownloadBase
-            .appendingPathComponent("argmaxinc/whisperkit-coreml")
+            .appendingPathComponent("models/argmaxinc/whisperkit-coreml")
             .appendingPathComponent(whisperModel)
     }
 
     private func loadWhisperModel() async {
-        // Only show the banner when the model files aren't on disk yet.
         let needsDownload = !FileManager.default.fileExists(atPath: whisperModelPath.path)
-        if needsDownload {
-            await MainActor.run { isModelLoading = true }
+        // Show "Downloading" banner only when model files are not on disk yet.
+        // Show "Preparing" banner when model exists but needs Core ML compilation (prewarm).
+        await MainActor.run {
+            if needsDownload {
+                self.isModelLoading = true
+            } else {
+                self.isModelPrewarming = true
+            }
         }
         do {
-            // prewarm: true compiles the Core ML models for this hardware immediately
-            // after download, so the very first transcribe() call is not blocked
-            // by JIT compilation (which can take several minutes).
             let pipe = try await WhisperKit(
                 model: whisperModel,
                 downloadBase: whisperDownloadBase,
@@ -152,14 +157,16 @@ class AudioEngineManager: NSObject, ObservableObject {
                 prewarm: true
             )
             await MainActor.run {
-                self.whisperKit     = pipe
-                self.isModelLoading = false
-                self.isModelReady   = true
+                self.whisperKit        = pipe
+                self.isModelLoading    = false
+                self.isModelPrewarming = false
+                self.isModelReady      = true
                 Logger.shared.log("WhisperKit: model '\(self.whisperModel)' ready.")
             }
         } catch {
             await MainActor.run {
-                self.isModelLoading = false
+                self.isModelLoading    = false
+                self.isModelPrewarming = false
                 Logger.shared.log("WhisperKit: failed to load – \(error.localizedDescription)")
             }
         }
