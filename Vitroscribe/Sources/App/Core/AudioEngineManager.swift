@@ -140,34 +140,31 @@ class AudioEngineManager: NSObject, ObservableObject {
 
     private func loadWhisperModel() async {
         let needsDownload = !FileManager.default.fileExists(atPath: whisperModelPath.path)
-        // Show "Downloading" banner only when model files are not on disk yet.
-        // Show "Preparing" banner when model exists but needs Core ML compilation (prewarm).
+        Logger.shared.log("WhisperKit: starting load – model='\(whisperModel)' needsDownload=\(needsDownload) path=\(whisperModelPath.path)")
         await MainActor.run {
-            if needsDownload {
-                self.isModelLoading = true
-            } else {
-                self.isModelPrewarming = true
-            }
+            if needsDownload { self.isModelLoading = true }
         }
+        let t0 = Date()
         do {
             let pipe = try await WhisperKit(
                 model: whisperModel,
                 downloadBase: whisperDownloadBase,
-                verbose: false,
-                prewarm: true
+                verbose: false
             )
+            let elapsed = String(format: "%.1f", Date().timeIntervalSince(t0))
             await MainActor.run {
                 self.whisperKit        = pipe
                 self.isModelLoading    = false
                 self.isModelPrewarming = false
                 self.isModelReady      = true
-                Logger.shared.log("WhisperKit: model '\(self.whisperModel)' ready.")
+                Logger.shared.log("WhisperKit: model ready in \(elapsed)s – '\(self.whisperModel)'")
             }
         } catch {
+            let elapsed = String(format: "%.1f", Date().timeIntervalSince(t0))
             await MainActor.run {
                 self.isModelLoading    = false
                 self.isModelPrewarming = false
-                Logger.shared.log("WhisperKit: failed to load – \(error.localizedDescription)")
+                Logger.shared.log("WhisperKit: failed after \(elapsed)s – \(error.localizedDescription)")
             }
         }
     }
@@ -403,11 +400,13 @@ class AudioEngineManager: NSObject, ObservableObject {
                 noSpeechThreshold: 0.3
             )
 
-            // Run transcription with a 90-second timeout so the app can never
-            // hang permanently if Core ML stalls on this hardware.
+            let chunkT0 = Date()
+            Logger.shared.log("WhisperKit: transcribing chunk at +\(Int(chunkOffsetSeconds))s (\(samples.count) samples)")
+
             let transcriptionTask = Task { try await whisper.transcribe(audioArray: samples, decodeOptions: options) }
             let timeoutTask = Task {
-                try await Task.sleep(nanoseconds: 90_000_000_000)
+                try await Task.sleep(nanoseconds: 600_000_000_000) // 10 min timeout
+                Logger.shared.log("WhisperKit: transcription TIMED OUT at +\(Int(chunkOffsetSeconds))s")
                 transcriptionTask.cancel()
             }
             let results: [TranscriptionResult]
@@ -416,15 +415,16 @@ class AudioEngineManager: NSObject, ObservableObject {
                 timeoutTask.cancel()
             } catch {
                 timeoutTask.cancel()
-                throw error   // falls through to the outer catch
+                throw error
             }
 
+            let chunkElapsed = String(format: "%.1f", Date().timeIntervalSince(chunkT0))
             await MainActor.run { [weak self] in
                 guard let self = self else { return }
                 self.mergeResults(results, chunkOffsetSeconds: chunkOffsetSeconds)
                 self.currentTranscript = self.reconstructFromLedger()
                 self.isTranscribing    = false
-                Logger.shared.log("Transcribed chunk at +\(Int(chunkOffsetSeconds))s – \(self.currentTranscript.count) chars total")
+                Logger.shared.log("WhisperKit: chunk done in \(chunkElapsed)s at +\(Int(chunkOffsetSeconds))s – \(self.currentTranscript.count) chars total")
 
                 // ── Catch-up: if audio accumulated during processing, run immediately ──
                 // This is what closes the gap: instead of waiting up to 25 more seconds

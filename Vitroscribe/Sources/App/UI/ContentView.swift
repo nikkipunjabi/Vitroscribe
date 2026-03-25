@@ -86,26 +86,6 @@ struct ContentView: View {
                     .padding(.bottom, 4)
                 }
 
-                // Whisper model prewarming banner (shown on every launch until model is compiled)
-                if audioManager.isModelPrewarming {
-                    HStack(spacing: 12) {
-                        ProgressView().scaleEffect(0.75)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Preparing AI Transcription Engine")
-                                .fontWeight(.semibold)
-                                .font(.subheadline)
-                            Text("Optimising model for your Mac. This takes a moment on first launch — won't happen again.")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
-                        Spacer()
-                    }
-                    .padding(12)
-                    .background(Color.orange.opacity(0.10))
-                    .cornerRadius(10)
-                    .padding(.horizontal)
-                    .padding(.bottom, 4)
-                }
 
                 // Screen-recording permission warning
                 if !meetingDetector.isScreenRecordingAuthorized {
