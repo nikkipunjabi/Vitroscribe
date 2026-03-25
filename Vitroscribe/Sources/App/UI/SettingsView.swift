@@ -138,60 +138,130 @@ struct SettingsView: View {
                 .background(Color.secondary.opacity(0.1))
                 .cornerRadius(12)
                 
-                // Combined Events List
-                let allEvents = (googleCal.upcomingEvents + msCal.upcomingEvents).sorted { 
-                    ($0.startDate ?? Date.distantFuture) < ($1.startDate ?? Date.distantFuture)
-                }
-                
-                if !allEvents.isEmpty {
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("Upcoming Meetings (\(allEvents.count))")
-                            .font(.headline)
-                        
-                        VStack(spacing: 8) {
-                            ForEach(allEvents.prefix(25)) { event in
-                                HStack {
-                                    VStack(alignment: .leading) {
-                                        Text(event.summary ?? "No Title")
-                                            .fontWeight(.medium)
-                                        HStack {
-                                            if let start = event.startDate {
-                                                Text(start.formatted(date: .abbreviated, time: .shortened))
-                                                    .font(.caption)
-                                                    .foregroundColor(.secondary)
-                                            }
-                                            Text("•")
-                                            Text(event.source.rawValue.capitalized)
-                                                .font(.caption)
-                                                .foregroundColor(.blue)
-                                        }
-                                    }
-                                    
-                                    Spacer()
-                                    
-                                    if let link = event.joinLink, let url = URL(string: link) {
-                                        Button("Join") {
-                                            NSWorkspace.shared.open(url)
-                                        }
-                                        .buttonStyle(.bordered)
-                                        .controlSize(.small)
-                                    }
-                                }
-                                .padding(8)
-                                .background(Color.white.opacity(0.05))
-                                .cornerRadius(8)
-                            }
-                        }
-                    }
-                    .padding()
-                    .background(Color.secondary.opacity(0.1))
-                    .cornerRadius(12)
-                }
+                // Combined Events — today + next 2 days only
+                UpcomingMeetingsSection(
+                    googleEvents: googleCal.upcomingEvents,
+                    msEvents: msCal.upcomingEvents
+                )
                 
                 Spacer()
             }
             .padding()
         }
         .frame(minWidth: 450, minHeight: 600)
+    }
+}
+
+// MARK: - Upcoming Meetings Section
+
+private struct UpcomingMeetingsSection: View {
+    let googleEvents: [CalendarEvent]
+    let msEvents: [CalendarEvent]
+
+    private var dayGroups: [(label: String, date: Date, events: [CalendarEvent])] {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        let allEvents = (googleEvents + msEvents).sorted {
+            ($0.startDate ?? .distantFuture) < ($1.startDate ?? .distantFuture)
+        }
+
+        return (0...2).compactMap { offset -> (String, Date, [CalendarEvent])? in
+            guard let day = calendar.date(byAdding: .day, value: offset, to: today) else { return nil }
+            let dayEnd = calendar.date(byAdding: .day, value: 1, to: day)!
+            let events = allEvents.filter {
+                guard let s = $0.startDate else { return false }
+                return s >= day && s < dayEnd
+            }
+            guard !events.isEmpty else { return nil }
+            let label: String
+            switch offset {
+            case 0: label = "Today"
+            case 1: label = "Tomorrow"
+            default:
+                let fmt = DateFormatter()
+                fmt.dateFormat = "EEEE, MMM d"
+                label = fmt.string(from: day)
+            }
+            return (label, day, events)
+        }
+    }
+
+    var body: some View {
+        if dayGroups.isEmpty { EmptyView() } else {
+            VStack(alignment: .leading, spacing: 16) {
+                Text("Upcoming Meetings")
+                    .font(.headline)
+
+                ForEach(dayGroups, id: \.date) { group in
+                    VStack(alignment: .leading, spacing: 6) {
+                        // Day header
+                        HStack(spacing: 6) {
+                            Text(group.label)
+                                .font(.subheadline)
+                                .fontWeight(.semibold)
+                                .foregroundColor(group.label == "Today" ? .accentColor : .primary)
+                            Text("· \(group.events.count) meeting\(group.events.count == 1 ? "" : "s")")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        .padding(.bottom, 2)
+
+                        // Events
+                        VStack(spacing: 4) {
+                            ForEach(group.events) { event in
+                                MeetingRow(event: event)
+                            }
+                        }
+                    }
+                }
+            }
+            .padding()
+            .background(Color.secondary.opacity(0.1))
+            .cornerRadius(12)
+        }
+    }
+}
+
+private struct MeetingRow: View {
+    let event: CalendarEvent
+
+    private var timeString: String {
+        guard let start = event.startDate else { return "" }
+        let fmt = DateFormatter()
+        fmt.dateFormat = "h:mm a"
+        return fmt.string(from: start)
+    }
+
+    var body: some View {
+        HStack(spacing: 10) {
+            // Time badge
+            Text(timeString)
+                .font(.caption)
+                .fontWeight(.medium)
+                .foregroundColor(.secondary)
+                .frame(width: 60, alignment: .leading)
+
+            // Title + source
+            VStack(alignment: .leading, spacing: 1) {
+                Text(event.summary ?? "No Title")
+                    .fontWeight(.medium)
+                    .lineLimit(1)
+                Text(event.source.rawValue.capitalized)
+                    .font(.caption2)
+                    .foregroundColor(.blue)
+            }
+
+            Spacer()
+
+            if let link = event.joinLink, let url = URL(string: link) {
+                Button("Join") { NSWorkspace.shared.open(url) }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+            }
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 7)
+        .background(Color.primary.opacity(0.04))
+        .cornerRadius(8)
     }
 }
