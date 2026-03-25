@@ -108,39 +108,39 @@ class AudioEngineManager: NSObject, ObservableObject {
 
     // MARK: - Whisper model loading
 
-    /// True only on the very first launch before the model files are cached.
-    private var whisperModelNeedsDownload: Bool {
-        // Once we've loaded successfully we set this flag — clean check for
-        // subsequent launches so no banner appears while loading from cache.
-        if UserDefaults.standard.bool(forKey: "whisperModelCached") { return false }
-        // Belt-and-suspenders: also look for the model files on disk.
-        let fm = FileManager.default
-        let searchRoots: [URL] = [
-            fm.urls(for: .applicationSupportDirectory, in: .userDomainMask).first,
-            fm.urls(for: .cachesDirectory, in: .userDomainMask).first
-        ].compactMap { $0 }
-        for root in searchRoots {
-            let candidate = root
-                .appendingPathComponent("huggingface/models/argmaxinc/whisperkit-coreml")
-                .appendingPathComponent(whisperModel)
-            if fm.fileExists(atPath: candidate.path) { return false }
-        }
-        return true
+    /// Persistent folder where the Whisper model is stored between launches.
+    /// WhisperKit downloads into <downloadBase>/argmaxinc/whisperkit-coreml/<model>/
+    private var whisperDownloadBase: URL {
+        let appSupport = FileManager.default
+            .urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("com.gravitas.Vitroscribe/WhisperModels")
+        try? FileManager.default.createDirectory(at: appSupport, withIntermediateDirectories: true)
+        return appSupport
+    }
+
+    /// The exact folder WhisperKit writes the model files into.
+    private var whisperModelPath: URL {
+        whisperDownloadBase
+            .appendingPathComponent("argmaxinc/whisperkit-coreml")
+            .appendingPathComponent(whisperModel)
     }
 
     private func loadWhisperModel() async {
-        let needsDownload = whisperModelNeedsDownload
-        // Only show the loading banner during the one-time model download.
+        // Only show the banner when the model files aren't on disk yet.
+        let needsDownload = !FileManager.default.fileExists(atPath: whisperModelPath.path)
         if needsDownload {
             await MainActor.run { isModelLoading = true }
         }
         do {
-            let pipe = try await WhisperKit(model: whisperModel, verbose: false)
+            let pipe = try await WhisperKit(
+                model: whisperModel,
+                downloadBase: whisperDownloadBase,
+                verbose: false
+            )
             await MainActor.run {
                 self.whisperKit     = pipe
                 self.isModelLoading = false
                 self.isModelReady   = true
-                UserDefaults.standard.set(true, forKey: "whisperModelCached")
                 Logger.shared.log("WhisperKit: model '\(self.whisperModel)' ready.")
             }
         } catch {
