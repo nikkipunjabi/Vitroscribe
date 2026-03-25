@@ -265,20 +265,33 @@ class AudioEngineManager: NSObject, ObservableObject {
         engine.stop()
         engine.inputNode.removeTap(onBus: 0)
 
-        // Async: wait for any in-flight transcription, transcribe remaining
-        // audio, then save and mark as stopped.
+        // Update UI immediately so the button and status bar respond right away.
+        // The async task below finishes saving in the background.
+        isRecording       = false
+        isManualRecording = false
+        isTranscribing    = false
+        syncTimer?.invalidate(); syncTimer = nil
+
+        // Async: wait briefly for any in-flight transcription (max 30 s),
+        // do a final pass on remaining audio, then save and clean up.
         Task { [weak self] in
             guard let self = self else { return }
 
-            // 1. Wait for any current transcription to finish.
+            // 1. Give any in-flight transcription up to 30 s to finish naturally.
+            let deadline = Date().addingTimeInterval(30)
             while await MainActor.run(resultType: Bool.self) { self.isTranscribing } {
-                try? await Task.sleep(nanoseconds: 100_000_000)  // poll every 100 ms
+                if Date() > deadline {
+                    Logger.shared.log("Stop: in-flight transcription deadline exceeded — forcing stop.")
+                    await MainActor.run { self.isTranscribing = false }
+                    break
+                }
+                try? await Task.sleep(nanoseconds: 100_000_000)
             }
 
             // 2. Transcribe whatever is left in the buffer.
             await self.transcribeRemainingAudio()
 
-            // 3. Finalize.
+            // 3. Save and clean up.
             await MainActor.run { self.finalizeStop() }
         }
     }
@@ -409,7 +422,7 @@ class AudioEngineManager: NSObject, ObservableObject {
 
             let transcriptionTask = Task { try await whisper.transcribe(audioArray: samples, decodeOptions: options) }
             let timeoutTask = Task {
-                try await Task.sleep(nanoseconds: 600_000_000_000) // 10 min timeout
+                try await Task.sleep(nanoseconds: 60_000_000_000) // 60 s timeout
                 Logger.shared.log("WhisperKit: transcription TIMED OUT at +\(Int(chunkOffsetSeconds))s")
                 transcriptionTask.cancel()
             }
