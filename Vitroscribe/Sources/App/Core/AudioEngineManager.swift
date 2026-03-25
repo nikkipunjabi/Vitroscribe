@@ -44,20 +44,27 @@ class AudioEngineManager: NSObject, ObservableObject {
     // MARK: Whisper hallucination suppression
     //
     // Whisper emits meta-tokens for silence, non-speech events, and foreign
-    // language detection.  These appear as free-form text so exact matching
-    // misses variants like "[BLANK _AUDIO]", "[ Foreign Language ]",
-    // "[SPEAKING JAPANESE]", etc.  We suppress them with three rules:
-    //   1. Any text fully wrapped in square brackets → [anything]
-    //   2. Any text fully wrapped in parentheses     → (anything)
-    //   3. Exact legacy tokens kept for safety
+    // language detection.  These appear as free-form text in two forms:
+    //   • Standalone segments: "[BLANK_AUDIO]", "(silence)" — entire text is a token
+    //   • Inline within sentences: "It is weird. [BLANK _AUDIO]" — token embedded mid-text
+    //
+    // Strategy:
+    //   1. stripHallucinationTokens() — removes all [..] and (..) substrings inline
+    //   2. isSuppressedText() — discards what remains if it's empty after stripping
+    private let hallucinationRegex: NSRegularExpression? = {
+        try? NSRegularExpression(pattern: "\\[[^\\]]*\\]|\\([^)]*\\)", options: [])
+    }()
+
+    /// Strips any [token] or (token) substrings Whisper embeds in text.
+    private func stripHallucinationTokens(_ text: String) -> String {
+        guard let regex = hallucinationRegex else { return text }
+        let range = NSRange(text.startIndex..., in: text)
+        let cleaned = regex.stringByReplacingMatches(in: text, range: range, withTemplate: "")
+        return cleaned.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
     private func isSuppressedText(_ raw: String) -> Bool {
-        let t = raw.trimmingCharacters(in: .whitespaces)
-        if t.isEmpty { return true }
-        // Rule 1: [...]  — covers [BLANK_AUDIO], [SPEAKING JAPANESE], etc.
-        if t.hasPrefix("[") && t.hasSuffix("]") { return true }
-        // Rule 2: (...)  — covers (silence), (speaking language), etc.
-        if t.hasPrefix("(") && t.hasSuffix(")") { return true }
-        return false
+        raw.trimmingCharacters(in: .whitespaces).isEmpty
     }
 
     // MARK: Audio accumulation
@@ -462,19 +469,18 @@ class AudioEngineManager: NSObject, ObservableObject {
     private func mergeResults(_ results: [TranscriptionResult], chunkOffsetSeconds: Double) {
         for result in results {
             for segment in result.segments {
-                // Filter Whisper hallucination tokens (silence, music, non-speech, etc.)
-                let segText = segment.text.trimmingCharacters(in: .whitespacesAndNewlines)
-                if isSuppressedText(segText) { continue }
-
                 if let words = segment.words, !words.isEmpty {
                     for wordTiming in words {
-                        let text = wordTiming.word.trimmingCharacters(in: .whitespaces)
+                        // Strip inline [tokens] and (tokens), then skip if empty.
+                        let text = stripHallucinationTokens(wordTiming.word)
                         if isSuppressedText(text) { continue }
                         let absMs = Int((chunkOffsetSeconds + Double(wordTiming.start)) * 1000)
                         timelineLedger[absMs] = text
                     }
                 } else {
-                    // No word timestamps — store the whole segment at its start time.
+                    // No word timestamps — strip inline tokens from the whole segment.
+                    let segText = stripHallucinationTokens(segment.text)
+                    if isSuppressedText(segText) { continue }
                     let absMs = Int((chunkOffsetSeconds + Double(segment.start)) * 1000)
                     timelineLedger[absMs] = segText
                 }
@@ -484,10 +490,19 @@ class AudioEngineManager: NSObject, ObservableObject {
 
     private func reconstructFromLedger() -> String {
         let sorted = timelineLedger.keys.sorted()
-        var text   = ""
-        var lastMs = -1
+        var text     = ""
+        var lastMs   = -1
+        var lastNorm = ""   // normalised form of the previous word for dedup
         for ms in sorted {
             guard let word = timelineLedger[ms] else { continue }
+
+            // Consecutive-duplicate suppression: skip if this word is the same as the
+            // previous one (case-insensitive, punctuation stripped).  Catches both
+            // Whisper repetition loops and overlap-region double-entries.
+            let norm = word.lowercased().trimmingCharacters(in: .punctuationCharacters)
+            if !norm.isEmpty && norm == lastNorm { continue }
+            lastNorm = norm
+
             if lastMs != -1 && (ms - lastMs) > 2000 {
                 text += "\n\n" + word
             } else {
