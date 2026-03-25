@@ -36,18 +36,28 @@ class AudioEngineManager: NSObject, ObservableObject {
 
     // MARK: Whisper
     private var whisperKit: WhisperKit?
-    private let whisperModel = "openai_whisper-small.en"
+    // Multilingual model — supports English, Hindi, Urdu, and 98 other languages.
+    private let whisperModel = "openai_whisper-small"
     private let whisperSampleRate: Double = 16_000
 
-    // MARK: Whisper hallucination tokens to suppress
-    private let suppressedTokens: Set<String> = [
-        "[BLANK_AUDIO]", "[blank_audio]",
-        "[MUSIC]", "[music]",
-        "[APPLAUSE]", "[applause]",
-        "[NOISE]", "[noise]",
-        "[silence]", "[Silence]",
-        "(blank audio)", "(silence)"
-    ]
+    // MARK: Whisper hallucination suppression
+    //
+    // Whisper emits meta-tokens for silence, non-speech events, and foreign
+    // language detection.  These appear as free-form text so exact matching
+    // misses variants like "[BLANK _AUDIO]", "[ Foreign Language ]",
+    // "[SPEAKING JAPANESE]", etc.  We suppress them with three rules:
+    //   1. Any text fully wrapped in square brackets → [anything]
+    //   2. Any text fully wrapped in parentheses     → (anything)
+    //   3. Exact legacy tokens kept for safety
+    private func isSuppressedText(_ raw: String) -> Bool {
+        let t = raw.trimmingCharacters(in: .whitespaces)
+        if t.isEmpty { return true }
+        // Rule 1: [...]  — covers [BLANK_AUDIO], [SPEAKING JAPANESE], etc.
+        if t.hasPrefix("[") && t.hasSuffix("]") { return true }
+        // Rule 2: (...)  — covers (silence), (speaking language), etc.
+        if t.hasPrefix("(") && t.hasSuffix(")") { return true }
+        return false
+    }
 
     // MARK: Audio accumulation
     // All access to audioSamples is serialised through audioQueue.
@@ -374,7 +384,6 @@ class AudioEngineManager: NSObject, ObservableObject {
         do {
             let options = DecodingOptions(
                 task: .transcribe,
-                language: "en",
                 temperature: 0.0,
                 temperatureFallbackCount: 5,
                 wordTimestamps: true,
@@ -411,14 +420,14 @@ class AudioEngineManager: NSObject, ObservableObject {
     private func mergeResults(_ results: [TranscriptionResult], chunkOffsetSeconds: Double) {
         for result in results {
             for segment in result.segments {
-                // Filter Whisper hallucination tokens (silence, music, etc.)
+                // Filter Whisper hallucination tokens (silence, music, non-speech, etc.)
                 let segText = segment.text.trimmingCharacters(in: .whitespacesAndNewlines)
-                if segText.isEmpty || suppressedTokens.contains(segText) { continue }
+                if isSuppressedText(segText) { continue }
 
                 if let words = segment.words, !words.isEmpty {
                     for wordTiming in words {
                         let text = wordTiming.word.trimmingCharacters(in: .whitespaces)
-                        if text.isEmpty || suppressedTokens.contains(text) { continue }
+                        if isSuppressedText(text) { continue }
                         let absMs = Int((chunkOffsetSeconds + Double(wordTiming.start)) * 1000)
                         timelineLedger[absMs] = text
                     }
