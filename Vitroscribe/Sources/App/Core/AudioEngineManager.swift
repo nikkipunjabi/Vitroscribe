@@ -44,18 +44,33 @@ class AudioEngineManager: NSObject, ObservableObject {
     // MARK: Whisper hallucination suppression
     //
     // Whisper emits meta-tokens for silence, non-speech events, and foreign
-    // language detection.  These appear as free-form text in two forms:
-    //   • Standalone segments: "[BLANK_AUDIO]", "(silence)" — entire text is a token
-    //   • Inline within sentences: "It is weird. [BLANK _AUDIO]" — token embedded mid-text
+    // language detection.  They appear in three forms:
+    //   1. Standalone segment:   "[BLANK_AUDIO]", "(silence)"
+    //   2. Inline in a sentence: "It is weird. [BLANK _AUDIO]"
+    //   3. Split word tokens:    "[BLANK" + "_AUDIO]"  ← WhisperKit breaks on space
     //
     // Strategy:
-    //   1. stripHallucinationTokens() — removes all [..] and (..) substrings inline
-    //   2. isSuppressedText() — discards what remains if it's empty after stripping
+    //   • Individual words: skip any token that starts or ends with a bracket/paren
+    //     (catches split fragments like "[BLANK" and "_AUDIO]")
+    //   • Segment / full text: regex strips all complete [..] and (..) spans,
+    //     then isSuppressedText drops anything left that is empty.
     private let hallucinationRegex: NSRegularExpression? = {
         try? NSRegularExpression(pattern: "\\[[^\\]]*\\]|\\([^)]*\\)", options: [])
     }()
 
-    /// Strips any [token] or (token) substrings Whisper embeds in text.
+    /// Returns true if this individual word token is a hallucination fragment.
+    /// Covers both complete tokens ("[BLANK_AUDIO]") and split halves ("[BLANK", "_AUDIO]").
+    private func isHallucinationWord(_ raw: String) -> Bool {
+        let t = raw.trimmingCharacters(in: .whitespaces)
+        if t.isEmpty { return true }
+        // Starts with '[' or '(' → beginning of a meta-token (may or may not be closed)
+        if t.hasPrefix("[") || t.hasPrefix("(") { return true }
+        // Ends with ']' or ')' but doesn't start with the opener → trailing fragment
+        if t.hasSuffix("]") || t.hasSuffix(")") { return true }
+        return false
+    }
+
+    /// Strips any complete [token] or (token) substrings Whisper embeds in text.
     private func stripHallucinationTokens(_ text: String) -> String {
         guard let regex = hallucinationRegex else { return text }
         let range = NSRange(text.startIndex..., in: text)
@@ -471,8 +486,10 @@ class AudioEngineManager: NSObject, ObservableObject {
             for segment in result.segments {
                 if let words = segment.words, !words.isEmpty {
                     for wordTiming in words {
-                        // Strip inline [tokens] and (tokens), then skip if empty.
-                        let text = stripHallucinationTokens(wordTiming.word)
+                        // Skip hallucination word tokens — includes split fragments like
+                        // "[BLANK" and "_AUDIO]" that don't fully match [..] on their own.
+                        if isHallucinationWord(wordTiming.word) { continue }
+                        let text = wordTiming.word.trimmingCharacters(in: .whitespaces)
                         if isSuppressedText(text) { continue }
                         let absMs = Int((chunkOffsetSeconds + Double(wordTiming.start)) * 1000)
                         timelineLedger[absMs] = text
