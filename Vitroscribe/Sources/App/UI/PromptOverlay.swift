@@ -112,6 +112,8 @@ class PromptOverlayManager: ObservableObject {
     var detectedTitle: String?
     
     func show(title: String? = nil) {
+        // Never prompt while a recording is already in progress.
+        guard !AudioEngineManager.shared.isRecording else { return }
         self.detectedTitle = title
         DispatchQueue.main.async {
             if self.window == nil {

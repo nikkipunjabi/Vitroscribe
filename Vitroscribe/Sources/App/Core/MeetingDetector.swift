@@ -118,7 +118,7 @@ class MeetingDetector: ObservableObject {
                     self.consecutiveMisses = 0
                     self.consecutiveHits += 1
                     
-                        if self.consecutiveHits >= self.hitsRequiredToStart && !self.isMeetingActive && !audioManager.isRecording {
+                        if self.consecutiveHits >= self.hitsRequiredToStart && !self.isMeetingActive && !audioManager.isRecording && !audioManager.isManualRecording {
                             self.isMeetingActive = true
                             Logger.shared.log("Auto-Detect: Meeting context found. Prompting user.")
                             self.sendRecordingPromptNotification(title: detectedTitle)
