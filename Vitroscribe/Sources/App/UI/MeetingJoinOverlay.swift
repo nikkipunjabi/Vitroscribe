@@ -3,28 +3,33 @@ import AppKit
 
 class MeetingJoinOverlayManager {
     static let shared = MeetingJoinOverlayManager()
-    
-    private var window: NSPanel?
-    
+
+    private let panelWidth:  CGFloat = 440
+    private let panelHeight: CGFloat = 160
+    private let spacing:     CGFloat = 12
+
+    // Ordered so stacking position is deterministic
+    private var windowOrder: [String] = []          // event IDs in arrival order
+    private var windows:     [String: NSPanel] = [:]
+
     func show(for event: CalendarEvent) {
-        if window != nil {
-            close()
-        }
-        
+        // Don't show a duplicate for the same event
+        guard windows[event.id] == nil else { return }
+
+        let eventId = event.id
         let contentView = MeetingJoinPromptView(event: event) { [weak self] in
-            self?.close()
+            self?.close(eventId: eventId)
         }
-        
+
         let hostingView = NSHostingView(rootView: contentView)
-        hostingView.frame = NSRect(x: 0, y: 0, width: 440, height: 160)
-        
+        hostingView.frame = NSRect(x: 0, y: 0, width: panelWidth, height: panelHeight)
+
         let panel = NSPanel(
-            contentRect: NSRect(x: 0, y: 0, width: 440, height: 160),
+            contentRect: NSRect(x: 0, y: 0, width: panelWidth, height: panelHeight),
             styleMask: [.nonactivatingPanel, .fullSizeContentView],
             backing: .buffered,
             defer: false
         )
-        
         panel.isFloatingPanel = true
         panel.level = .floating
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
@@ -34,19 +39,24 @@ class MeetingJoinOverlayManager {
         panel.hasShadow = true
         panel.contentView = hostingView
         panel.isMovableByWindowBackground = true
-        
-        self.window = panel
+
+        // Register before positioning so index is correct
+        let index = windowOrder.count
+        windowOrder.append(eventId)
+        windows[eventId] = panel
+
         updatePrivacySetting()
-        
-        // Position at top right
+
+        // Stack panels top-right, each new one below the previous
         if let screen = NSScreen.main {
             let screenRect = screen.visibleFrame
+            let yOffset = CGFloat(index) * (panelHeight + spacing)
             panel.setFrameOrigin(NSPoint(
-                x: screenRect.maxX - panel.frame.width - 20,
-                y: screenRect.maxY - panel.frame.height - 20
+                x: screenRect.maxX - panelWidth - 20,
+                y: screenRect.maxY - panelHeight - 20 - yOffset
             ))
         }
-        
+
         panel.makeKeyAndOrderFront(nil)
         panel.alphaValue = 0
         NSAnimationContext.runAnimationGroup { context in
@@ -54,30 +64,25 @@ class MeetingJoinOverlayManager {
             panel.animator().alphaValue = 1
         }
     }
-    
-    func close() {
-        guard let existingWindow = window else { return }
-        // Nullify immediately to prevent multiple close animations
-        self.window = nil
-        
-        DispatchQueue.main.async {
-            NSAnimationContext.runAnimationGroup { context in
-                context.duration = 0.4
-                existingWindow.animator().alphaValue = 0
-            } completionHandler: {
-                existingWindow.orderOut(nil)
-            }
+
+    func close(eventId: String) {
+        guard let existingWindow = windows[eventId] else { return }
+        windows.removeValue(forKey: eventId)
+        windowOrder.removeAll { $0 == eventId }
+
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = 0.4
+            existingWindow.animator().alphaValue = 0
+        } completionHandler: {
+            existingWindow.orderOut(nil)
         }
     }
-    
+
     func updatePrivacySetting() {
         DispatchQueue.main.async {
-            guard let window = self.window else { return }
             let isShared = AudioEngineManager.shared.isJoinPromptShared
-            if isShared {
-                window.sharingType = .readOnly
-            } else {
-                window.sharingType = .none
+            for (_, window) in self.windows {
+                window.sharingType = isShared ? .readOnly : .none
             }
         }
     }
