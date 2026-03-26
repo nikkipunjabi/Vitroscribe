@@ -13,7 +13,11 @@ class MeetingDetector: ObservableObject {
     @Published var isInMeetingContext: Bool = false
     private var checkTimer: Timer?
     private var isSuppressed: Bool = false
-    
+    /// Set when the user manually stops a recording while still in a meeting context.
+    /// Prevents auto-restart until ALL meeting contexts are gone (user is done with all meetings).
+    private var suppressedUntilMeetingEnds: Bool = false
+    private var wasRecordingOnLastTick: Bool = false
+
     // Performance: Fast polling (2s) for responsive auto-stop, like Krisp/Fathom.
     private var consecutiveHits: Int = 0
     private var consecutiveMisses: Int = 0
@@ -134,42 +138,63 @@ class MeetingDetector: ObservableObject {
                 // Publish raw context so the menu bar can always show a "Start Recording" shortcut
                 self.isInMeetingContext = meetingFound
 
+                // Detect when recording just stopped while still in a meeting context —
+                // this means the user explicitly stopped it. Suppress auto-restart until
+                // ALL meetings have ended (meetingFound goes false).
+                let justStopped = self.wasRecordingOnLastTick && !audioManager.isRecording
+                if justStopped && meetingFound {
+                    self.suppressedUntilMeetingEnds = true
+                    self.isMeetingActive = false
+                    self.consecutiveHits = 0
+                    Logger.shared.log("Auto-Record: Recording stopped by user during meeting — suppressing auto-restart.")
+                }
+                if !meetingFound {
+                    self.suppressedUntilMeetingEnds = false
+                }
+                self.wasRecordingOnLastTick = audioManager.isRecording
+
                 // TRIGGER: Context (URL/Title) AND Audio Flowing
                 let isCurrentlyInMeeting = meetingFound && audioFlowing
-                
+
                 if isCurrentlyInMeeting {
                     self.consecutiveMisses = 0
                     self.consecutiveHits += 1
-                    
-                        if self.consecutiveHits >= self.hitsRequiredToStart && !self.isMeetingActive && !audioManager.isRecording && !audioManager.isManualRecording {
-                            self.isMeetingActive = true
-                            if UserDefaults.standard.bool(forKey: "autoRecordMeetings") {
-                                Logger.shared.log("Auto-Record: Meeting detected, starting recording automatically.")
-                                audioManager.startRecording(manual: false, title: detectedTitle)
-                            } else {
-                                Logger.shared.log("Auto-Detect: Meeting context found. Prompting user.")
-                                self.sendRecordingPromptNotification(title: detectedTitle)
-                            }
+
+                    if self.consecutiveHits >= self.hitsRequiredToStart
+                        && !self.isMeetingActive
+                        && !audioManager.isRecording
+                        && !audioManager.isManualRecording
+                        && !self.suppressedUntilMeetingEnds {
+                        self.isMeetingActive = true
+                        if UserDefaults.standard.bool(forKey: "autoRecordMeetings") {
+                            Logger.shared.log("Auto-Record: Meeting detected, starting recording automatically.")
+                            audioManager.startRecording(manual: false, title: detectedTitle)
+                        } else {
+                            Logger.shared.log("Auto-Detect: Meeting context found. Prompting user.")
+                            self.sendRecordingPromptNotification(title: detectedTitle)
                         }
+                    }
                 } else {
                     self.consecutiveHits = 0
-                    
-                    // AUTO-STOP: 
+
+                    // AUTO-STOP:
                     // If we are recording (auto or managed), we stay active ONLY if the Context persists.
                     // We IGNORE audioFlowing here because our own recording makes it always true.
                     if audioManager.isRecording && !audioManager.isManualRecording {
                         self.consecutiveMisses += 1
-                        
+
                         // Stop after 5 consecutive checks (~10 seconds) with no meeting context.
                         if !meetingFound && self.consecutiveMisses >= 5 {
-                            Logger.shared.log("Auto-Detect: Meeting ended (Context lost after 30s). Stopping recording.")
+                            Logger.shared.log("Auto-Detect: Meeting ended. Stopping recording.")
                             self.isMeetingActive = false
                             self.consecutiveMisses = 0
                             audioManager.stopRecording()
                         }
                     } else {
                         self.consecutiveMisses = 0
-                        self.isMeetingActive = false
+                        if !self.suppressedUntilMeetingEnds {
+                            self.isMeetingActive = false
+                        }
                     }
                 }
             }
