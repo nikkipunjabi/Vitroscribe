@@ -149,16 +149,6 @@ class MenuBarManager: NSObject, ObservableObject {
         let inMeeting = detector.isInMeetingContext
         let autoRecord = UserDefaults.standard.bool(forKey: "autoRecordMeetings")
 
-        // ── Auto-Record toggle ────────────────────────────────────────
-        let autoItem = NSMenuItem(title: "Auto-Record Meetings",
-                                  action: #selector(toggleAutoRecord),
-                                  keyEquivalent: "")
-        autoItem.target = self
-        autoItem.state = autoRecord ? .on : .off
-        menu.addItem(autoItem)
-
-        menu.addItem(.separator())
-
         // ── Status ────────────────────────────────────────────────────
         let statusLine = NSMenuItem(
             title: audio.isRecording ? "● Recording Active" : (inMeeting ? "● Meeting Detected" : "○ Waiting for Meeting…"),
@@ -220,6 +210,16 @@ class MenuBarManager: NSObject, ObservableObject {
         openItem.image = NSImage(systemSymbolName: "macwindow", accessibilityDescription: nil)
         openItem.target = self
         menu.addItem(openItem)
+
+        menu.addItem(.separator())
+
+        // ── Auto-Record toggle ────────────────────────────────────────
+        let autoItem = NSMenuItem(title: "Auto-Record Meetings",
+                                  action: #selector(toggleAutoRecord),
+                                  keyEquivalent: "")
+        autoItem.target = self
+        autoItem.state = autoRecord ? .on : .off
+        menu.addItem(autoItem)
 
         menu.addItem(.separator())
 
