@@ -147,6 +147,17 @@ class MenuBarManager: NSObject, ObservableObject {
 
         let detector = MeetingDetector.shared
         let inMeeting = detector.isInMeetingContext
+        let autoRecord = UserDefaults.standard.bool(forKey: "autoRecordMeetings")
+
+        // ── Auto-Record toggle ────────────────────────────────────────
+        let autoItem = NSMenuItem(title: "Auto-Record Meetings",
+                                  action: #selector(toggleAutoRecord),
+                                  keyEquivalent: "")
+        autoItem.target = self
+        autoItem.state = autoRecord ? .on : .off
+        menu.addItem(autoItem)
+
+        menu.addItem(.separator())
 
         // ── Status ────────────────────────────────────────────────────
         let statusLine = NSMenuItem(
@@ -238,6 +249,12 @@ class MenuBarManager: NSObject, ObservableObject {
     }
 
     // MARK: - Actions
+
+    @objc private func toggleAutoRecord() {
+        let current = UserDefaults.standard.bool(forKey: "autoRecordMeetings")
+        UserDefaults.standard.set(!current, forKey: "autoRecordMeetings")
+        rebuildMenu()
+    }
 
     @objc private func startRecording() {
         AudioEngineManager.shared.startRecording(manual: true)

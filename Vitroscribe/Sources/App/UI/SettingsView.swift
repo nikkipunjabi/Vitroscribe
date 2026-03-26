@@ -8,6 +8,13 @@ struct SettingsView: View {
     @ObservedObject var audioManager = AudioEngineManager.shared
     @ObservedObject var menuBar = MenuBarManager.shared
     @State private var isLaunchAtStartupEnabled: Bool = StartupManager.shared.isLaunchAtStartupEnabled()
+    @State private var autoRecordMeetings: Bool = {
+        // Default ON — if no value has been saved yet, treat it as enabled
+        if UserDefaults.standard.object(forKey: "autoRecordMeetings") == nil {
+            UserDefaults.standard.set(true, forKey: "autoRecordMeetings")
+        }
+        return UserDefaults.standard.bool(forKey: "autoRecordMeetings")
+    }()
     
     var body: some View {
         ScrollView {
@@ -37,6 +44,13 @@ struct SettingsView: View {
                         .font(.headline)
                         .padding(.bottom, 4)
                     
+                    Toggle("Auto-Record Meetings", isOn: $autoRecordMeetings)
+                        .onChange(of: autoRecordMeetings) { newValue in
+                            UserDefaults.standard.set(newValue, forKey: "autoRecordMeetings")
+                            MenuBarManager.shared.rebuildMenu()
+                        }
+                        .help("When on, recording starts automatically the moment a meeting is detected — no prompt needed. Turn off to be asked each time.")
+
                     Toggle("Launch at Startup", isOn: $isLaunchAtStartupEnabled)
                         .onChange(of: isLaunchAtStartupEnabled) { newValue in
                             StartupManager.shared.setLaunchAtStartup(newValue)

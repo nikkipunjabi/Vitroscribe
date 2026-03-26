@@ -36,6 +36,9 @@ struct VitroscribeApp: App {
 class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationWillFinishLaunching(_ notification: Notification) {
+        // Register defaults so first-launch values are correct before any reads
+        UserDefaults.standard.register(defaults: ["autoRecordMeetings": true])
+
         // Set activation policy BEFORE the window appears — prevents dock icon flash
         // when starting in Menubar Only mode.
         MenuBarManager.shared.applyInitialActivationPolicy()
