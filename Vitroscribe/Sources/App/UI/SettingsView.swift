@@ -39,40 +39,80 @@ struct SettingsView: View {
                 Divider()
                 
                 // General Settings
-                VStack(alignment: .leading, spacing: 12) {
+                VStack(alignment: .leading, spacing: 16) {
                     Text("General")
                         .font(.headline)
-                        .padding(.bottom, 4)
-                    
-                    Toggle("Auto-Record Meetings", isOn: $autoRecordMeetings)
-                        .onChange(of: autoRecordMeetings) { newValue in
-                            UserDefaults.standard.set(newValue, forKey: "autoRecordMeetings")
-                            MenuBarManager.shared.rebuildMenu()
-                        }
-                        .help("When on, recording starts automatically the moment a meeting is detected — no prompt needed. Turn off to be asked each time.")
+                        .padding(.bottom, 2)
 
-                    Toggle("Launch at Startup", isOn: $isLaunchAtStartupEnabled)
-                        .onChange(of: isLaunchAtStartupEnabled) { newValue in
-                            StartupManager.shared.setLaunchAtStartup(newValue)
-                        }
-
-                    Picker("App Visibility Mode", selection: Binding(
-                        get: { menuBar.visibilityMode },
-                        set: { menuBar.setVisibilityMode($0) }
-                    )) {
-                        ForEach(AppVisibilityMode.allCases, id: \.self) { mode in
-                            Text(mode.displayName).tag(mode)
-                        }
+                    SettingsRow(
+                        icon: "record.circle",
+                        iconColor: autoRecordMeetings ? .red : .secondary,
+                        title: "Auto-Record Meetings",
+                        subtitle: autoRecordMeetings
+                            ? "Enabled — Recording starts automatically when a meeting is detected."
+                            : "Disabled — You will be asked before each meeting is recorded."
+                    ) {
+                        Toggle("", isOn: $autoRecordMeetings)
+                            .onChange(of: autoRecordMeetings) { newValue in
+                                UserDefaults.standard.set(newValue, forKey: "autoRecordMeetings")
+                            }
+                            .labelsHidden()
                     }
-                    .pickerStyle(.menu)
-                    .help("Dock & Menubar: shows in both. Menubar Only: hides dock icon. Dock Only: removes the menu bar icon.")
-                    
+
+                    Divider()
+
+                    SettingsRow(
+                        icon: "menubar.rectangle",
+                        iconColor: .blue,
+                        title: "App Visibility",
+                        subtitle: menuBar.visibilityMode.displayName
+                    ) {
+                        Picker("", selection: Binding(
+                            get: { menuBar.visibilityMode },
+                            set: { menuBar.setVisibilityMode($0) }
+                        )) {
+                            ForEach(AppVisibilityMode.allCases, id: \.self) { mode in
+                                Text(mode.displayName).tag(mode)
+                            }
+                        }
+                        .pickerStyle(.menu)
+                        .labelsHidden()
+                        .frame(width: 160)
+                    }
+
+                    Divider()
+
+                    SettingsRow(
+                        icon: "bolt.fill",
+                        iconColor: isLaunchAtStartupEnabled ? .green : .secondary,
+                        title: "Launch at Startup",
+                        subtitle: isLaunchAtStartupEnabled
+                            ? "Enabled — Vitroscribe starts automatically when you log in."
+                            : "Disabled — Launch Vitroscribe manually when needed."
+                    ) {
+                        Toggle("", isOn: $isLaunchAtStartupEnabled)
+                            .onChange(of: isLaunchAtStartupEnabled) { newValue in
+                                StartupManager.shared.setLaunchAtStartup(newValue)
+                            }
+                            .labelsHidden()
+                    }
+                }
+                .padding()
+                .background(Color.secondary.opacity(0.1))
+                .cornerRadius(12)
+
+                // Screen Share Privacy
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Screen Share Privacy")
+                        .font(.headline)
+                        .padding(.bottom, 4)
+
                     Toggle("Show Recording Icon on Screen Share", isOn: $audioManager.isOverlayShared)
                         .help("If disabled, the red recording icon will be invisible to others when you share your screen.")
-                    
+
                     Toggle("Show 'Join Meeting' HUD on Screen Share", isOn: $audioManager.isJoinPromptShared)
                         .help("If disabled, the meeting join prompt will be invisible to others during your screen share.")
-                    
+
                     Toggle("Show 'Meeting Detected' Popup on Screen Share", isOn: $audioManager.isPromptOverlayShared)
                         .help("If disabled, the 'Meeting Detected' prompt will be invisible to others during your screen share.")
                 }
@@ -289,5 +329,35 @@ private struct MeetingRow: View {
         .padding(.vertical, 7)
         .background(Color.primary.opacity(0.04))
         .cornerRadius(8)
+    }
+}
+
+// MARK: - Settings Row
+
+private struct SettingsRow<Control: View>: View {
+    let icon: String
+    let iconColor: Color
+    let title: String
+    let subtitle: String
+    @ViewBuilder let control: () -> Control
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: icon)
+                .foregroundColor(iconColor)
+                .frame(width: 20)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .fontWeight(.medium)
+                Text(subtitle)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+
+            Spacer()
+
+            control()
+        }
     }
 }

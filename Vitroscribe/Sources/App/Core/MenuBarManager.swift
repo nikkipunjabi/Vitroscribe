@@ -147,7 +147,6 @@ class MenuBarManager: NSObject, ObservableObject {
 
         let detector = MeetingDetector.shared
         let inMeeting = detector.isInMeetingContext
-        let autoRecord = UserDefaults.standard.bool(forKey: "autoRecordMeetings")
 
         // ── Status ────────────────────────────────────────────────────
         let statusLine = NSMenuItem(
@@ -158,7 +157,7 @@ class MenuBarManager: NSObject, ObservableObject {
 
         menu.addItem(.separator())
 
-        // ── Meeting detected but not recording → show prominent prompt ─
+        // ── Meeting detected but not recording → one-click shortcut ───
         if inMeeting && !audio.isRecording {
             let promptItem = NSMenuItem(
                 title: "Meeting Detected — Start Recording",
@@ -213,33 +212,6 @@ class MenuBarManager: NSObject, ObservableObject {
 
         menu.addItem(.separator())
 
-        // ── Auto-Record toggle ────────────────────────────────────────
-        let autoItem = NSMenuItem(title: "Auto-Record Meetings",
-                                  action: #selector(toggleAutoRecord),
-                                  keyEquivalent: "")
-        autoItem.target = self
-        autoItem.state = autoRecord ? .on : .off
-        menu.addItem(autoItem)
-
-        menu.addItem(.separator())
-
-        // ── App Visibility Mode ───────────────────────────────────────
-        let subMenu = NSMenu()
-        for mode in AppVisibilityMode.allCases {
-            let item = NSMenuItem(title: mode.displayName,
-                                  action: #selector(changeVisibility(_:)),
-                                  keyEquivalent: "")
-            item.target = self
-            item.representedObject = mode.rawValue
-            item.state = (visibilityMode == mode) ? .on : .off
-            subMenu.addItem(item)
-        }
-        let visItem = NSMenuItem(title: "App Visibility Mode", action: nil, keyEquivalent: "")
-        visItem.submenu = subMenu
-        menu.addItem(visItem)
-
-        menu.addItem(.separator())
-
         // ── Quit ─────────────────────────────────────────────────────
         menu.addItem(NSMenuItem(title: "Quit Vitroscribe",
                                 action: #selector(NSApplication.terminate(_:)),
@@ -249,12 +221,6 @@ class MenuBarManager: NSObject, ObservableObject {
     }
 
     // MARK: - Actions
-
-    @objc private func toggleAutoRecord() {
-        let current = UserDefaults.standard.bool(forKey: "autoRecordMeetings")
-        UserDefaults.standard.set(!current, forKey: "autoRecordMeetings")
-        rebuildMenu()
-    }
 
     @objc private func startRecording() {
         AudioEngineManager.shared.startRecording(manual: true)
