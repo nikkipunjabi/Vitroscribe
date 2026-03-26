@@ -179,19 +179,29 @@ class MeetingDetector: ObservableObject {
     private struct BrowserTab {
         let url: String
         let title: String
+        let bodySnippet: String   // first 300 chars of body text, for "left meeting" detection
     }
 
-    /// Returns only tabs that represent an ACTIVE meeting (URL + title both confirmed).
-    /// For Google Meet, the tab title changes from "Meet - xxx" to "Google Meet" / "Your meeting has ended"
-    /// when the call ends — so checking the title prevents false positives from the lingering URL.
+    /// Returns only tabs that represent an ACTIVE meeting.
+    /// For Google Meet, document.title does NOT change when you leave — it keeps "Meet – Title"
+    /// even on the "You've left the meeting" page. So we also run a tiny JS snippet to read
+    /// the body text and check for the leave-state explicitly.
     private func getActiveMeetingTabs(from appName: String) -> [BrowserTab]? {
-        // Each line: URL<TAB>Title
+        // Each line: URL<TAB>Title<TAB>BodySnippet (body only fetched for meet.google.com tabs)
         let scriptSource = """
         tell application "\(appName)"
             set output to ""
             repeat with w in windows
                 repeat with t in tabs of w
-                    set output to output & URL of t & "\t" & name of t & "\n"
+                    set tabURL to URL of t
+                    set tabTitle to name of t
+                    set bodySnip to ""
+                    if tabURL contains "meet.google.com" then
+                        try
+                            set bodySnip to execute t javascript "document.body ? document.body.innerText.substring(0, 300) : ''"
+                        end try
+                    end if
+                    set output to output & tabURL & "\t" & tabTitle & "\t" & bodySnip & "\n"
                 end repeat
             end repeat
             return output
@@ -218,29 +228,36 @@ class MeetingDetector: ObservableObject {
                     let parts = line.components(separatedBy: "\t")
                     guard parts.count >= 2 else { return nil }
                     let url = parts[0].trimmingCharacters(in: .whitespacesAndNewlines)
-                    let title = parts[1...].joined(separator: "\t").trimmingCharacters(in: .whitespacesAndNewlines)
-                    guard !url.isEmpty, self.isActiveMeetingTab(url: url, title: title) else { return nil }
-                    return BrowserTab(url: url, title: title)
+                    let title = parts[1].trimmingCharacters(in: .whitespacesAndNewlines)
+                    let body = parts.count >= 3 ? parts[2...].joined(separator: "\t").trimmingCharacters(in: .whitespacesAndNewlines) : ""
+                    guard !url.isEmpty, self.isActiveMeetingTab(url: url, title: title, body: body) else { return nil }
+                    return BrowserTab(url: url, title: title, bodySnippet: body)
                 }
         } catch {
             return nil
         }
     }
 
-    private func isActiveMeetingTab(url: String, title: String) -> Bool {
+    private func isActiveMeetingTab(url: String, title: String, body: String = "") -> Bool {
         let lowerURL = url.lowercased()
         let lowerTitle = title.lowercased()
+        let lowerBody = body.lowercased()
 
-        // Google Meet: valid meeting URL AND the tab title must still show "meet - "
-        // (the title changes to "Google Meet" or "Your meeting has ended" once the call ends)
+        // Google Meet: valid meeting URL AND not in a "left meeting" state.
+        // document.title does NOT change after leaving — it stays "Meet – Title".
+        // So we check the body text for the leave-screen copy as the reliable signal.
         if lowerURL.contains("meet.google.com/") {
             let components = lowerURL.components(separatedBy: "meet.google.com/")
             if components.count > 1 {
                 let pathPart = components[1].split { $0 == "?" || $0 == "#" }.first.map(String.init) ?? ""
                 let noise = ["", "landing", "new", "check", "h", "home", "lookup"]
                 let validURL = !noise.contains(pathPart) && pathPart.count >= 4
-                let activeTitle = lowerTitle.hasPrefix("meet - ") || lowerTitle.hasPrefix("meet – ")
-                return validURL && activeTitle
+                let hasTitle = lowerTitle.hasPrefix("meet - ") || lowerTitle.hasPrefix("meet – ")
+                // If we have body text and it shows the leave screen, the meeting is over.
+                let hasLeftMeeting = !lowerBody.isEmpty &&
+                    (lowerBody.contains("you've left") || lowerBody.contains("you left the meeting") ||
+                     lowerBody.contains("left the meeting"))
+                return validURL && hasTitle && !hasLeftMeeting
             }
         }
 
