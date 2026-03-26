@@ -34,14 +34,51 @@ struct VitroscribeApp: App {
 }
 
 class AppDelegate: NSObject, NSApplicationDelegate {
+
+    func applicationWillFinishLaunching(_ notification: Notification) {
+        // Set activation policy BEFORE the window appears — prevents dock icon flash
+        // when starting in Menubar Only mode.
+        MenuBarManager.shared.applyInitialActivationPolicy()
+    }
+
     func applicationDidFinishLaunching(_ notification: Notification) {
-        // Setup initial logger, audio, etc.
         Logger.shared.log("Vitroscribe launched.")
-        
-        // Initialize services so listeners/timers start and notifications register
+
         _ = MeetingDetector.shared
         _ = GoogleCalendarService.shared
         _ = MicrosoftCalendarService.shared
+
+        // Set up menu bar icon + menu
+        MenuBarManager.shared.setup()
+
+        // Become window delegate so we can intercept close in Menubar Only mode
+        DispatchQueue.main.async {
+            NSApp.windows.forEach { window in
+                if !(window is NSPanel) { window.delegate = self }
+            }
+        }
+    }
+
+    // Re-show the main window when user clicks the dock icon while all windows are hidden
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows: Bool) -> Bool {
+        if !hasVisibleWindows {
+            for window in NSApp.windows where !(window is NSPanel) {
+                window.makeKeyAndOrderFront(nil)
+            }
+        }
+        return true
+    }
+}
+
+extension AppDelegate: NSWindowDelegate {
+    // In Menubar Only mode, pressing the red close button hides the window
+    // instead of destroying it, so "Open Vitroscribe" can always bring it back.
+    func windowShouldClose(_ sender: NSWindow) -> Bool {
+        if MenuBarManager.shared.visibilityMode == .menubarOnly {
+            sender.orderOut(nil)
+            return false
+        }
+        return true
     }
 }
 

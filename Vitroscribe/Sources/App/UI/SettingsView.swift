@@ -6,6 +6,7 @@ struct SettingsView: View {
     @ObservedObject var msAuth = MicrosoftAuthManager.shared
     @ObservedObject var msCal = MicrosoftCalendarService.shared
     @ObservedObject var audioManager = AudioEngineManager.shared
+    @ObservedObject var menuBar = MenuBarManager.shared
     @State private var isLaunchAtStartupEnabled: Bool = StartupManager.shared.isLaunchAtStartupEnabled()
     
     var body: some View {
@@ -40,6 +41,17 @@ struct SettingsView: View {
                         .onChange(of: isLaunchAtStartupEnabled) { newValue in
                             StartupManager.shared.setLaunchAtStartup(newValue)
                         }
+
+                    Picker("App Visibility Mode", selection: Binding(
+                        get: { menuBar.visibilityMode },
+                        set: { menuBar.setVisibilityMode($0) }
+                    )) {
+                        ForEach(AppVisibilityMode.allCases, id: \.self) { mode in
+                            Text(mode.displayName).tag(mode)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    .help("Dock & Menubar: shows in both. Menubar Only: hides dock icon. Dock Only: removes the menu bar icon.")
                     
                     Toggle("Show Recording Icon on Screen Share", isOn: $audioManager.isOverlayShared)
                         .help("If disabled, the red recording icon will be invisible to others when you share your screen.")
