@@ -95,11 +95,43 @@ class MenuBarManager: NSObject, ObservableObject {
 
     private func updateStatusIcon() {
         guard let button = statusItem?.button else { return }
-        let recording = AudioEngineManager.shared.isRecording
-        button.image = NSImage(systemSymbolName: recording ? "mic.fill" : "mic",
-                               accessibilityDescription: "Vitroscribe")
-        button.image?.isTemplate = true
-        button.contentTintColor = recording ? .systemRed : nil
+        button.image = makeMenuBarImage(recording: AudioEngineManager.shared.isRecording)
+        button.image?.isTemplate = false
+    }
+
+    private func makeMenuBarImage(recording: Bool) -> NSImage {
+        let canvasSize = NSSize(width: 22, height: 22)
+        let iconSize   = NSSize(width: 18, height: 18)
+        let dotSize:  CGFloat = 7
+
+        let image = NSImage(size: canvasSize)
+        image.lockFocus()
+
+        // Draw the app icon centred vertically
+        let iconOrigin = NSPoint(x: 0, y: (canvasSize.height - iconSize.height) / 2)
+        NSApp.applicationIconImage?.draw(
+            in: NSRect(origin: iconOrigin, size: iconSize),
+            from: .zero,
+            operation: .sourceOver,
+            fraction: 1.0)
+
+        // Overlay a small red dot in the bottom-right corner when recording
+        if recording {
+            // White halo so the dot is visible on any menu-bar colour
+            NSColor.white.setFill()
+            NSBezierPath(ovalIn: NSRect(x: iconSize.width - dotSize + 2,
+                                        y: 0,
+                                        width: dotSize + 2,
+                                        height: dotSize + 2)).fill()
+            NSColor.systemRed.setFill()
+            NSBezierPath(ovalIn: NSRect(x: iconSize.width - dotSize + 3,
+                                        y: 1,
+                                        width: dotSize,
+                                        height: dotSize)).fill()
+        }
+
+        image.unlockFocus()
+        return image
     }
 
     func rebuildMenu() {
