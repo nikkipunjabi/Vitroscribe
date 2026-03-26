@@ -103,23 +103,12 @@ class MenuBarManager: NSObject, ObservableObject {
         guard let button = statusItem?.button else { return }
         let recording = AudioEngineManager.shared.isRecording
         if recording {
-            // Composite image: waveform drawn at the correct appearance colour + red dot.
-            // contentTintColor on a template image causes macOS to render it black on dark
-            // menu bars, so we draw the composite manually instead.
-            let size = NSSize(width: 26, height: 18)
-            let composite = NSImage(size: size)
-            composite.lockFocus()
-            if let wave = NSImage(systemSymbolName: "waveform", accessibilityDescription: nil) {
-                let isDark = NSApp.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
-                (isDark ? NSColor.white : NSColor.black).set()
-                wave.draw(in: NSRect(x: 0, y: 1, width: 18, height: 16),
-                          from: .zero, operation: .sourceOver, fraction: 1)
-            }
-            NSColor.systemRed.setFill()
-            NSBezierPath(ovalIn: NSRect(x: 19, y: 10, width: 7, height: 7)).fill()
-            composite.unlockFocus()
-            composite.isTemplate = false
-            button.image = composite
+            // Red waveform — visible on both dark and light menu bars.
+            let config = NSImage.SymbolConfiguration(paletteColors: [.systemRed])
+            let image = NSImage(systemSymbolName: "waveform", accessibilityDescription: "Vitroscribe")?
+                .withSymbolConfiguration(config)
+            image?.isTemplate = false
+            button.image = image
             button.contentTintColor = nil
         } else {
             let image = NSImage(systemSymbolName: "waveform", accessibilityDescription: "Vitroscribe")

@@ -77,8 +77,8 @@ class MeetingDetector: ObservableObject {
                 let isZoom = ownerName.contains("zoom") && (windowName.contains("meeting") || windowName.contains("call"))
                 // Teams: "Meeting | Microsoft Teams" or "Call |"
                 let isTeams = ownerName.contains("teams") && (windowName.contains("meeting") || windowName.contains("call"))
-                // Meet: "Meet - " is the prefix for active Google Meet tabs (ended tabs lose this prefix)
-                let isMeet = windowName.contains("meet - ")
+                // Meet: active tabs show "Meet – Title" (en dash) or "Meet - Title" (hyphen)
+                let isMeet = windowName.contains("meet - ") || windowName.contains("meet – ")
 
                 if isZoom || isTeams || isMeet {
                     meetingFound = true
@@ -239,7 +239,7 @@ class MeetingDetector: ObservableObject {
                 let pathPart = components[1].split { $0 == "?" || $0 == "#" }.first.map(String.init) ?? ""
                 let noise = ["", "landing", "new", "check", "h", "home", "lookup"]
                 let validURL = !noise.contains(pathPart) && pathPart.count >= 4
-                let activeTitle = lowerTitle.hasPrefix("meet - ")
+                let activeTitle = lowerTitle.hasPrefix("meet - ") || lowerTitle.hasPrefix("meet – ")
                 return validURL && activeTitle
             }
         }
