@@ -56,14 +56,15 @@
     <h1>Vitroscribe</h1>
 
     <h2 id="privacy-policy">Privacy Policy</h2>
-    <p><strong>Last Updated:</strong> March 14, 2026</p>
+    <p><strong>Last Updated:</strong> March 26, 2026</p>
     <h3 id="introduction">Introduction</h3>
     <p>
       Vitroscribe (&quot;we&quot;, &quot;us&quot;, or &quot;our&quot;) is
       committed to protecting your privacy. Vitroscribe is a privacy-first macOS
       application designed to transcribe meetings entirely on your local device.
       This Privacy Policy explains how we handle your data when you use our
-      application and connect to third-party services like Google Calendar.
+      application and connect to third-party services like Google Calendar and
+      Microsoft Outlook.
     </p>
     <h3 id="1-data-processing-privacy-first-architecture-">
       1. Data Processing (Privacy-First Architecture)
@@ -75,13 +76,24 @@
     <ul>
       <li>
         <strong>Audio &amp; Transcripts:</strong> All audio recording and
-        speech-to-text transcription are performed locally on your Mac using
-        Apple&#39;s SFSpeechRecognizer. No audio or transcript data is ever
-        uploaded to our servers or any third-party cloud.
+        speech-to-text transcription are performed entirely on your Mac using
+        WhisperKit with Apple Core ML. No audio, transcript, or speech data is
+        ever uploaded to our servers or any third-party cloud.
+      </li>
+      <li>
+        <strong>Multilingual Processing:</strong> The on-device Whisper model
+        supports transcription in multiple languages. All language processing
+        happens locally with no network calls.
       </li>
       <li>
         <strong>Local Storage:</strong> Your transcripts and meeting history are
-        stored in a local SQLite database on your device&#39;s hard drive.
+        stored in a local SQLite database on your device&#39;s hard drive. We
+        have no access to this data.
+      </li>
+      <li>
+        <strong>Auto-Record:</strong> When Auto-Record Meetings is enabled,
+        recordings start automatically when a meeting is detected. No audio
+        data leaves your device regardless of this setting.
       </li>
     </ul>
     <h3 id="2-google-api-data-usage">2. Google API Data Usage</h3>
@@ -93,13 +105,13 @@
       <li>
         <strong>How we use this data:</strong> We fetch upcoming events to
         identify meeting links (Google Meet, Zoom, Teams) and display them in
-        your dashboard. This allows the app to provide the &quot;Join &amp;
-        Capture&quot; HUD.
+        your dashboard and menu bar. This allows the app to provide the
+        &quot;Join &amp; Capture&quot; HUD and upcoming meetings list.
       </li>
       <li>
         <strong>Storage:</strong> We do not store your Google Calendar data on
-        any external servers. This data is only stored locally on your device to
-        facilitate app features.
+        any external servers. This data is only held in memory and locally on
+        your device to facilitate app features.
       </li>
       <li>
         <strong>Data Sharing:</strong> We do not sell, trade, or share your
@@ -115,7 +127,27 @@
         >Google API Service User Data Policy</a
       >, including the Limited Use requirements.
     </p>
-    <h3 id="3-permissions">3. Permissions</h3>
+    <h3 id="3-microsoft-api-data-usage">3. Microsoft API Data Usage</h3>
+    <p>
+      When you connect your Microsoft account, Vitroscribe requests read-only
+      access to your Outlook calendar events via Microsoft Graph.
+    </p>
+    <ul>
+      <li>
+        <strong>How we use this data:</strong> We fetch upcoming events to
+        identify Microsoft Teams meeting links and display them alongside your
+        Google Calendar events.
+      </li>
+      <li>
+        <strong>Storage:</strong> We do not store your Microsoft calendar data
+        on any external servers. Data is only held locally on your device.
+      </li>
+      <li>
+        <strong>Data Sharing:</strong> We do not sell, trade, or share your
+        Microsoft user data with any third parties.
+      </li>
+    </ul>
+    <h3 id="4-permissions">4. Permissions</h3>
     <p>Vitroscribe requires the following permissions to function:</p>
     <ul>
       <li>
@@ -123,32 +155,36 @@
         transcription.
       </li>
       <li>
-        <strong>Speech Recognition</strong>: To convert audio to text on-device.
+        <strong>Screen Recording / Window List</strong>: To detect meeting
+        application windows (Zoom, Teams, Google Meet, Slack, Webex) on your
+        screen. No screen content is captured or stored — only window titles
+        and application names are read.
+      </li>
+      <li>
+        <strong>Automation</strong>: To read browser tab titles and URLs via
+        AppleScript, used solely to detect active Google Meet, Zoom, or Teams
+        tabs. No browsing data is stored or transmitted.
       </li>
       <li>
         <strong>Calendar</strong>: To sync your schedule (via Google/Microsoft
         OAuth).
       </li>
-      <li>
-        <strong>Automation/Accessibility</strong>: To detect meeting windows in
-        your browser.
-      </li>
     </ul>
-    <h3 id="4-third-party-services">4. Third-Party Services</h3>
+    <h3 id="5-third-party-services">5. Third-Party Services</h3>
     <p>
-      Vitroscribe uses Google and Microsoft OAuth for authentication. These
-      services may collect information as governed by their respective privacy
-      policies.
+      Vitroscribe uses Google and Microsoft OAuth for calendar authentication.
+      These services operate under their own privacy policies. Vitroscribe does
+      not use any analytics, crash reporting, or advertising services.
     </p>
-    <h3 id="5-changes-to-this-policy">5. Changes to This Policy</h3>
+    <h3 id="6-changes-to-this-policy">6. Changes to This Policy</h3>
     <p>
       We may update this policy occasionally. We will notify you of any changes
       by updating the &quot;Last Updated&quot; date.
     </p>
-    <h3 id="6-contact-us">6. Contact Us</h3>
+    <h3 id="7-contact-us">7. Contact Us</h3>
     <p>
       For questions about this Privacy Policy, please contact:
-      nikki.punjabi@gmail.com
+      <a href="mailto:nikki.punjabi@gmail.com">nikki.punjabi@gmail.com</a>
     </p>
   </body>
 </html>

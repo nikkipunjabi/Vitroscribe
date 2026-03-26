@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Vitroscribe | Autonomous, Privacy-First Meeting Transcription</title>
     <meta name="description"
-        content="Vitroscribe is a macOS app that automatically detects, records, and transcribes your meetings locally on your device. Sync calendars and never miss a detail.">
+        content="Vitroscribe is a macOS app that automatically detects, records, and transcribes your meetings locally on your device using WhisperKit. Sync Google and Outlook calendars and never miss a detail.">
 
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -304,7 +304,7 @@
             <span class="verification-badge">✨ Now in Public Beta</span>
             <h1>Vitroscribe</h1>
             <p class="tagline">The autonomous, privacy-first macOS scribe. Automatically detect, record, and transcribe
-                meetings with 100% on-device processing.</p>
+                meetings in any language — 100% on-device, nothing ever leaves your Mac.</p>
 
             <div class="cta-group">
                 <a target="_blank" href="https://nikkipunjabi.com/vitroscribe/vitroscribe.dmg" class="btn btn-primary">
@@ -326,38 +326,38 @@
             <div class="feature-card">
                 <div class="feature-icon"><i data-lucide="shield-check"></i></div>
                 <h3>100% On-Device Privacy</h3>
-                <p>No audio or text data ever leaves your Mac. Vitroscribe uses Apple's native SFSpeechRecognizer for
-                    secure, offline transcription.</p>
+                <p>No audio or text ever leaves your Mac. Vitroscribe uses WhisperKit with Apple Core ML for
+                    multilingual, offline transcription — no internet required.</p>
             </div>
             <div class="feature-card">
                 <div class="feature-icon"><i data-lucide="calendar"></i></div>
                 <h3>Smart Calendar Sync</h3>
-                <p>Connect Google Calendar and Outlook to automatically fetch meeting links. Join and start recording
-                    with a single click from the HUD.</p>
+                <p>Connect Google Calendar and Microsoft Outlook to automatically fetch meeting links. Join and start
+                    recording with a single click from the HUD or menu bar.</p>
             </div>
             <div class="feature-card">
                 <div class="feature-icon"><i data-lucide="zap"></i></div>
                 <h3>Autonomous Detection</h3>
-                <p>Vitroscribe automatically spots when you join a Zoom, Google Meet, or Microsoft Teams call and starts
-                    the transcription engine instantly.</p>
+                <p>Automatically spots when you join Zoom, Google Meet, Microsoft Teams, Slack, or Webex — and starts
+                    recording without any manual action.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon"><i data-lucide="menu"></i></div>
+                <h3>Lives in Your Menu Bar</h3>
+                <p>Runs quietly in the background as a native menu bar app. Start or stop recording, see your next
+                    meeting, and open the full app — all from the top of your screen.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon"><i data-lucide="layout"></i></div>
+                <h3>Meeting Reminders & HUD</h3>
+                <p>Floating join prompts appear before each meeting with a one-click "Join & Capture" action. Multiple
+                    concurrent meeting reminders are stacked and shown simultaneously.</p>
             </div>
             <div class="feature-card">
                 <div class="feature-icon"><i data-lucide="search"></i></div>
                 <h3>Global Search & History</h3>
-                <p>Instantly find specific transcripts by searching through titles or content. Your entire meeting
-                    archive is available at your fingertips.</p>
-            </div>
-            <div class="feature-card">
-                <div class="feature-icon"><i data-lucide="layout"></i></div>
-                <h3>Premium Join HUD</h3>
-                <p>A sleek floating notification appears before your meetings, offering a "Join & Capture" action to
-                    streamline your entry into the call.</p>
-            </div>
-            <div class="feature-card">
-                <div class="feature-icon"><i data-lucide="clock"></i></div>
-                <h3>Infinite Timeline</h3>
-                <p>Precise audio stitching ensures zero word-loss, even during network stutters or application switches.
-                </p>
+                <p>Instantly find any transcript by searching titles or content. Your entire meeting archive lives
+                    locally in a SQLite database on your device.</p>
             </div>
         </div>
     </section>
