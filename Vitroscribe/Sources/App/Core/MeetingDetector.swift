@@ -77,13 +77,26 @@ class MeetingDetector: ObservableObject {
                     isBrowserOpen = true
                 }
 
-                // Zoom: "Zoom Meeting" or "Zoom - Free Account" (during call)
-                let isZoom = ownerName.contains("zoom") && (windowName.contains("meeting") || windowName.contains("call"))
-                // Teams: "Meeting | Microsoft Teams" or "Call |"
-                let isTeams = ownerName.contains("teams") && (windowName.contains("meeting") || windowName.contains("call"))
-                // Note: Google Meet is browser-based — handled by the AppleScript tab check below,
-                // NOT here. Chrome keeps "Meet – …" in the window title even after leaving,
-                // so checking it here causes a false positive that prevents auto-stop.
+                // Window size — used to detect Teams call view (large window = in-call UI)
+                let bounds = window[kCGWindowBounds as String] as? [String: Any]
+                let winWidth  = bounds?["Width"]  as? CGFloat ?? 0
+                let winHeight = bounds?["Height"] as? CGFloat ?? 0
+                let isLargeWindow = winWidth > 700 && winHeight > 400
+
+                // Zoom: window title contains "meeting" or "call"
+                let isZoom = ownerName.contains("zoom") &&
+                    (windowName.contains("meeting") || windowName.contains("call"))
+
+                // Teams native app: title may be just the meeting name (no "meeting"/"call" keyword).
+                // Fall back to a large-window check — when Teams is in a call, the main window
+                // is full/near-full screen.  Exclude the generic "microsoft teams" home screen title.
+                let isTeams = ownerName.contains("microsoft teams") &&
+                    !windowName.isEmpty &&
+                    (windowName.contains("meeting") || windowName.contains("call") ||
+                     windowName.contains("| microsoft teams") ||
+                     (isLargeWindow && windowName != "microsoft teams"))
+
+                // Note: Google Meet is browser-based — handled by the AppleScript tab check below.
 
                 if isZoom || isTeams {
                     meetingFound = true
