@@ -36,70 +36,86 @@ class MeetingDetector: ObservableObject {
     private func checkForActiveMeetings() {
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             guard let self = self else { return }
-            
+
             if self.isSuppressed { return }
-            
-            // 1. Scan Visible Windows (High Performance)
-            let windowOptions = CGWindowListOption(arrayLiteral: .excludeDesktopElements, .optionOnScreenOnly)
-            guard let windowList = CGWindowListCopyWindowInfo(windowOptions, kCGNullWindowID) as? [[String: Any]] else {
+
+            // 1a. Scan on-screen windows for Zoom, Teams, and Google Meet
+            let onScreenOptions = CGWindowListOption(arrayLiteral: .excludeDesktopElements, .optionOnScreenOnly)
+            // 1b. Scan ALL windows (including minimised) for Slack/Webex whose call UI is often a small floating window
+            let allWindowOptions = CGWindowListOption(arrayLiteral: .excludeDesktopElements)
+            guard let windowList = CGWindowListCopyWindowInfo(onScreenOptions, kCGNullWindowID) as? [[String: Any]],
+                  let allWindowList = CGWindowListCopyWindowInfo(allWindowOptions, kCGNullWindowID) as? [[String: Any]] else {
                 return
             }
-            
+
             let ownPID = ProcessInfo.processInfo.processIdentifier
             var externalWindowFound = false
             var meetingFound = false
             var exactMeetingMatch = false
             var isBrowserOpen = false
             var detectedTitle: String? = nil
-            
+
             let browsers = ["google chrome", "arc", "safari", "microsoft edge"]
-            
+
             for window in windowList {
                 let windowName = (window[kCGWindowName as String] as? String ?? "").lowercased()
                 let ownerName = (window[kCGWindowOwnerName as String] as? String ?? "").lowercased()
                 let windowPID = window[kCGWindowOwnerPID as String] as? Int32 ?? 0
-                
+
                 if windowPID != ownPID && !windowName.isEmpty {
                     externalWindowFound = true
                 }
-                
+
                 if browsers.contains(ownerName) {
                     isBrowserOpen = true
                 }
-                
-                // --- STRICT MATCHING LOGIC ---
-                // We only match windows that signify an ACTIVE call.
+
                 // Zoom: "Zoom Meeting" or "Zoom - Free Account" (during call)
                 let isZoom = ownerName.contains("zoom") && (windowName.contains("meeting") || windowName.contains("call"))
                 // Teams: "Meeting | Microsoft Teams" or "Call |"
                 let isTeams = ownerName.contains("teams") && (windowName.contains("meeting") || windowName.contains("call"))
-                // Webex/Slack: "Huddle", "Call", "Meeting"
-                let isOthers = (ownerName.contains("webex") || ownerName.contains("slack") || ownerName.contains("cisco")) && 
-                               (windowName.contains("meeting") || windowName.contains("call") || windowName.contains("huddle"))
-                // Meet: "Meet - " is the prefix for active Google Meet tabs
+                // Meet: "Meet - " is the prefix for active Google Meet tabs (ended tabs lose this prefix)
                 let isMeet = windowName.contains("meet - ")
-                
-                if isZoom || isTeams || isOthers || isMeet {
+
+                if isZoom || isTeams || isMeet {
                     meetingFound = true
                     exactMeetingMatch = true
                     detectedTitle = windowName
                     break
                 }
             }
-            
+
+            // Slack/Webex/Cisco: check ALL windows so minimised huddle/call windows are caught
+            if !exactMeetingMatch {
+                for window in allWindowList {
+                    let windowName = (window[kCGWindowName as String] as? String ?? "").lowercased()
+                    let ownerName = (window[kCGWindowOwnerName as String] as? String ?? "").lowercased()
+
+                    let isSlack = ownerName.contains("slack") &&
+                                  (windowName.contains("huddle") || windowName.contains("call") ||
+                                   windowName.contains("meeting") || windowName.hasPrefix("slack call"))
+                    let isWebex = (ownerName.contains("webex") || ownerName.contains("cisco")) &&
+                                  (windowName.contains("meeting") || windowName.contains("call") || windowName.contains("huddle"))
+
+                    if isSlack || isWebex {
+                        meetingFound = true
+                        exactMeetingMatch = true
+                        detectedTitle = windowName
+                        break
+                    }
+                }
+            }
+
             DispatchQueue.main.async { self.isScreenRecordingAuthorized = externalWindowFound }
-            
-            // 2. Browser Tab Check (Only if window scan didn't find a definitive match)
+
+            // 2. Browser Tab Check — uses title + URL so a "meeting ended" page is not treated as active
             if !exactMeetingMatch && isBrowserOpen {
                 for browser in ["Google Chrome", "Arc", "Safari", "Microsoft Edge"] {
-                    // Optimized: Only get URLs if the browser has Windows visible
-                    if let urls = self.getURLs(from: browser) {
-                        for url in urls {
-                            if self.isMeetingURL(url) {
-                                meetingFound = true
-                                exactMeetingMatch = true
-                                break
-                            }
+                    if let tabs = self.getActiveMeetingTabs(from: browser) {
+                        if !tabs.isEmpty {
+                            meetingFound = true
+                            exactMeetingMatch = true
+                            detectedTitle = tabs.first?.title
                         }
                     }
                     if exactMeetingMatch { break }
@@ -149,51 +165,77 @@ class MeetingDetector: ObservableObject {
         }
     }
     
-    private func getURLs(from appName: String) -> [String]? {
-        // Light-weight AppleScript via Process to avoid app-level threading issues
-        let scriptSource = "tell application \"\(appName)\" to return URL of every tab of every window"
-        
+    private struct BrowserTab {
+        let url: String
+        let title: String
+    }
+
+    /// Returns only tabs that represent an ACTIVE meeting (URL + title both confirmed).
+    /// For Google Meet, the tab title changes from "Meet - xxx" to "Google Meet" / "Your meeting has ended"
+    /// when the call ends — so checking the title prevents false positives from the lingering URL.
+    private func getActiveMeetingTabs(from appName: String) -> [BrowserTab]? {
+        // Each line: URL<TAB>Title
+        let scriptSource = """
+        tell application "\(appName)"
+            set output to ""
+            repeat with w in windows
+                repeat with t in tabs of w
+                    set output to output & URL of t & "\t" & name of t & "\n"
+                end repeat
+            end repeat
+            return output
+        end tell
+        """
+
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
         process.arguments = ["-e", scriptSource]
-        
+
         let pipe = Pipe()
         process.standardOutput = pipe
         process.standardError = Pipe()
-        
+
         do {
             try process.run()
             process.waitUntilExit()
-            
             let data = pipe.fileHandleForReading.readDataToEndOfFile()
-            if let output = String(data: data, encoding: .utf8), !output.isEmpty {
-                return output.trimmingCharacters(in: .whitespacesAndNewlines)
-                             .components(separatedBy: ", ")
-                             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-                             .filter { !$0.isEmpty }
-            }
+            guard let output = String(data: data, encoding: .utf8), !output.isEmpty else { return nil }
+
+            return output
+                .components(separatedBy: "\n")
+                .compactMap { line -> BrowserTab? in
+                    let parts = line.components(separatedBy: "\t")
+                    guard parts.count >= 2 else { return nil }
+                    let url = parts[0].trimmingCharacters(in: .whitespacesAndNewlines)
+                    let title = parts[1...].joined(separator: "\t").trimmingCharacters(in: .whitespacesAndNewlines)
+                    guard !url.isEmpty, self.isActiveMeetingTab(url: url, title: title) else { return nil }
+                    return BrowserTab(url: url, title: title)
+                }
         } catch {
             return nil
         }
-        return nil
     }
-    
-    private func isMeetingURL(_ url: String) -> Bool {
-        let lower = url.lowercased()
-        if lower.contains("meet.google.com/") {
-            let components = lower.components(separatedBy: "meet.google.com/")
+
+    private func isActiveMeetingTab(url: String, title: String) -> Bool {
+        let lowerURL = url.lowercased()
+        let lowerTitle = title.lowercased()
+
+        // Google Meet: valid meeting URL AND the tab title must still show "meet - "
+        // (the title changes to "Google Meet" or "Your meeting has ended" once the call ends)
+        if lowerURL.contains("meet.google.com/") {
+            let components = lowerURL.components(separatedBy: "meet.google.com/")
             if components.count > 1 {
-                let fullPath = components[1]
-                // Safely extract the meeting ID before any '?' or '#'
-                let pathPart = fullPath.split { $0 == "?" || $0 == "#" }.first ?? ""
-                let path = String(pathPart)
-                
-                // "landing", "home", "check" are NOT active meetings
+                let pathPart = components[1].split { $0 == "?" || $0 == "#" }.first.map(String.init) ?? ""
                 let noise = ["", "landing", "new", "check", "h", "home", "lookup"]
-                return !noise.contains(path) && path.count >= 4
+                let validURL = !noise.contains(pathPart) && pathPart.count >= 4
+                let activeTitle = lowerTitle.hasPrefix("meet - ")
+                return validURL && activeTitle
             }
         }
-        return lower.contains("zoom.us/j/") || lower.contains("teams.microsoft.com/l/meetup-join") || lower.contains("webex.com/meet")
+
+        return lowerURL.contains("zoom.us/j/") ||
+               lowerURL.contains("teams.microsoft.com/l/meetup-join") ||
+               lowerURL.contains("webex.com/meet")
     }
     
     private func sendRecordingPromptNotification(title: String? = nil) {
