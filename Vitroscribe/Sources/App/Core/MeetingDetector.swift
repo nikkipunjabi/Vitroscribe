@@ -119,7 +119,7 @@ class MeetingDetector: ObservableObject {
                         if !tabs.isEmpty {
                             meetingFound = true
                             exactMeetingMatch = true
-                            detectedTitle = tabs.first?.title
+                            detectedTitle = self.cleanMeetingTitle(tabs.first?.title)
                         }
                     }
                     if exactMeetingMatch { break }
@@ -277,5 +277,30 @@ class MeetingDetector: ObservableObject {
             self.isSuppressed = false
             Logger.shared.log("Meeting detector: Suppression lifted.")
         }
+    }
+
+    // MARK: - Title Cleanup
+
+    /// Strips platform prefixes/suffixes so only the actual meeting name is stored.
+    /// e.g. "Meet – Gravitas Standup" → "Gravitas Standup"
+    ///      "Gravitas Standup | Microsoft Teams" → "Gravitas Standup"
+    private func cleanMeetingTitle(_ raw: String?) -> String? {
+        guard var title = raw, !title.isEmpty else { return nil }
+
+        // Google Meet: "Meet – Title" or "Meet - Title"
+        for prefix in ["Meet – ", "Meet - "] {
+            if title.hasPrefix(prefix) {
+                title = String(title.dropFirst(prefix.count))
+                break
+            }
+        }
+
+        // Microsoft Teams browser: "Title | Microsoft Teams"
+        if let range = title.range(of: " | Microsoft Teams", options: .caseInsensitive) {
+            title = String(title[..<range.lowerBound])
+        }
+
+        let cleaned = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        return cleaned.isEmpty ? nil : cleaned
     }
 }
