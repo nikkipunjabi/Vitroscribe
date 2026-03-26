@@ -26,7 +26,8 @@ class AudioEngineManager: NSObject, ObservableObject {
     @Published var isRecording: Bool = false
     @Published var isManualRecording: Bool = false
     @Published var isAuthorized: Bool = false
-    @Published var isModelLoading: Bool = false
+    @Published var isModelLoading: Bool = false    // true = downloading
+    @Published var isModelPrewarming: Bool = false  // true = compiling Core ML for this hardware
     @Published var isModelReady: Bool = false
     @Published var isTranscribing: Bool = false
 
@@ -36,18 +37,50 @@ class AudioEngineManager: NSObject, ObservableObject {
 
     // MARK: Whisper
     private var whisperKit: WhisperKit?
-    private let whisperModel = "openai_whisper-small.en"
+    // Multilingual model — supports English, Hindi, Urdu, and 98 other languages.
+    private let whisperModel = "openai_whisper-small"
     private let whisperSampleRate: Double = 16_000
 
-    // MARK: Whisper hallucination tokens to suppress
-    private let suppressedTokens: Set<String> = [
-        "[BLANK_AUDIO]", "[blank_audio]",
-        "[MUSIC]", "[music]",
-        "[APPLAUSE]", "[applause]",
-        "[NOISE]", "[noise]",
-        "[silence]", "[Silence]",
-        "(blank audio)", "(silence)"
-    ]
+    // MARK: Whisper hallucination suppression
+    //
+    // Whisper emits meta-tokens for silence, non-speech events, and foreign
+    // language detection.  They appear in three forms:
+    //   1. Standalone segment:   "[BLANK_AUDIO]", "(silence)"
+    //   2. Inline in a sentence: "It is weird. [BLANK _AUDIO]"
+    //   3. Split word tokens:    "[BLANK" + "_AUDIO]"  ← WhisperKit breaks on space
+    //
+    // Strategy:
+    //   • Individual words: skip any token that starts or ends with a bracket/paren
+    //     (catches split fragments like "[BLANK" and "_AUDIO]")
+    //   • Segment / full text: regex strips all complete [..] and (..) spans,
+    //     then isSuppressedText drops anything left that is empty.
+    private let hallucinationRegex: NSRegularExpression? = {
+        try? NSRegularExpression(pattern: "\\[[^\\]]*\\]|\\([^)]*\\)", options: [])
+    }()
+
+    /// Returns true if this individual word token is a hallucination fragment.
+    /// Covers both complete tokens ("[BLANK_AUDIO]") and split halves ("[BLANK", "_AUDIO]").
+    private func isHallucinationWord(_ raw: String) -> Bool {
+        let t = raw.trimmingCharacters(in: .whitespaces)
+        if t.isEmpty { return true }
+        // Starts with '[' or '(' → beginning of a meta-token (may or may not be closed)
+        if t.hasPrefix("[") || t.hasPrefix("(") { return true }
+        // Ends with ']' or ')' but doesn't start with the opener → trailing fragment
+        if t.hasSuffix("]") || t.hasSuffix(")") { return true }
+        return false
+    }
+
+    /// Strips any complete [token] or (token) substrings Whisper embeds in text.
+    private func stripHallucinationTokens(_ text: String) -> String {
+        guard let regex = hallucinationRegex else { return text }
+        let range = NSRange(text.startIndex..., in: text)
+        let cleaned = regex.stringByReplacingMatches(in: text, range: range, withTemplate: "")
+        return cleaned.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private func isSuppressedText(_ raw: String) -> Bool {
+        raw.trimmingCharacters(in: .whitespaces).isEmpty
+    }
 
     // MARK: Audio accumulation
     // All access to audioSamples is serialised through audioQueue.
@@ -109,44 +142,55 @@ class AudioEngineManager: NSObject, ObservableObject {
     // MARK: - Whisper model loading
 
     /// Persistent folder where the Whisper model is stored between launches.
-    /// WhisperKit downloads into <downloadBase>/argmaxinc/whisperkit-coreml/<model>/
+    /// WhisperKit downloads into <downloadBase>/models/argmaxinc/whisperkit-coreml/<model>/
     private var whisperDownloadBase: URL {
         let appSupport = FileManager.default
             .urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("com.gravitas.Vitroscribe/WhisperModels")
+            .appendingPathComponent("com.nikkipunjabi.Vitroscribe/WhisperModels")
         try? FileManager.default.createDirectory(at: appSupport, withIntermediateDirectories: true)
         return appSupport
     }
 
     /// The exact folder WhisperKit writes the model files into.
+    /// WhisperKit prepends "models/" to the downloadBase, so the real path is
+    /// <downloadBase>/models/argmaxinc/whisperkit-coreml/<model>/
     private var whisperModelPath: URL {
         whisperDownloadBase
-            .appendingPathComponent("argmaxinc/whisperkit-coreml")
+            .appendingPathComponent("models/argmaxinc/whisperkit-coreml")
             .appendingPathComponent(whisperModel)
     }
 
     private func loadWhisperModel() async {
-        // Only show the banner when the model files aren't on disk yet.
         let needsDownload = !FileManager.default.fileExists(atPath: whisperModelPath.path)
-        if needsDownload {
-            await MainActor.run { isModelLoading = true }
+        Logger.shared.log("WhisperKit: starting load – model='\(whisperModel)' needsDownload=\(needsDownload) path=\(whisperModelPath.path)")
+        await MainActor.run {
+            if needsDownload {
+                self.isModelLoading = true     // shows download banner
+            } else {
+                self.isModelPrewarming = true  // hides "unavailable" during silent 8-9s load
+            }
         }
+        let t0 = Date()
         do {
             let pipe = try await WhisperKit(
                 model: whisperModel,
                 downloadBase: whisperDownloadBase,
                 verbose: false
             )
+            let elapsed = String(format: "%.1f", Date().timeIntervalSince(t0))
             await MainActor.run {
-                self.whisperKit     = pipe
-                self.isModelLoading = false
-                self.isModelReady   = true
-                Logger.shared.log("WhisperKit: model '\(self.whisperModel)' ready.")
+                self.whisperKit        = pipe
+                self.isModelLoading    = false
+                self.isModelPrewarming = false
+                self.isModelReady      = true
+                Logger.shared.log("WhisperKit: model ready in \(elapsed)s – '\(self.whisperModel)'")
             }
         } catch {
+            let elapsed = String(format: "%.1f", Date().timeIntervalSince(t0))
             await MainActor.run {
-                self.isModelLoading = false
-                Logger.shared.log("WhisperKit: failed to load – \(error.localizedDescription)")
+                self.isModelLoading    = false
+                self.isModelPrewarming = false
+                Logger.shared.log("WhisperKit: failed after \(elapsed)s – \(error.localizedDescription)")
             }
         }
     }
@@ -243,20 +287,33 @@ class AudioEngineManager: NSObject, ObservableObject {
         engine.stop()
         engine.inputNode.removeTap(onBus: 0)
 
-        // Async: wait for any in-flight transcription, transcribe remaining
-        // audio, then save and mark as stopped.
+        // Update UI immediately so the button and status bar respond right away.
+        // The async task below finishes saving in the background.
+        isRecording       = false
+        isManualRecording = false
+        isTranscribing    = false
+        syncTimer?.invalidate(); syncTimer = nil
+
+        // Async: wait briefly for any in-flight transcription (max 30 s),
+        // do a final pass on remaining audio, then save and clean up.
         Task { [weak self] in
             guard let self = self else { return }
 
-            // 1. Wait for any current transcription to finish.
+            // 1. Give any in-flight transcription up to 30 s to finish naturally.
+            let deadline = Date().addingTimeInterval(30)
             while await MainActor.run(resultType: Bool.self) { self.isTranscribing } {
-                try? await Task.sleep(nanoseconds: 100_000_000)  // poll every 100 ms
+                if Date() > deadline {
+                    Logger.shared.log("Stop: in-flight transcription deadline exceeded — forcing stop.")
+                    await MainActor.run { self.isTranscribing = false }
+                    break
+                }
+                try? await Task.sleep(nanoseconds: 100_000_000)
             }
 
             // 2. Transcribe whatever is left in the buffer.
             await self.transcribeRemainingAudio()
 
-            // 3. Finalize.
+            // 3. Save and clean up.
             await MainActor.run { self.finalizeStop() }
         }
     }
@@ -374,7 +431,6 @@ class AudioEngineManager: NSObject, ObservableObject {
         do {
             let options = DecodingOptions(
                 task: .transcribe,
-                language: "en",
                 temperature: 0.0,
                 temperatureFallbackCount: 5,
                 wordTimestamps: true,
@@ -383,14 +439,31 @@ class AudioEngineManager: NSObject, ObservableObject {
                 noSpeechThreshold: 0.3
             )
 
-            let results = try await whisper.transcribe(audioArray: samples, decodeOptions: options)
+            let chunkT0 = Date()
+            Logger.shared.log("WhisperKit: transcribing chunk at +\(Int(chunkOffsetSeconds))s (\(samples.count) samples)")
 
+            let transcriptionTask = Task { try await whisper.transcribe(audioArray: samples, decodeOptions: options) }
+            let timeoutTask = Task {
+                try await Task.sleep(nanoseconds: 60_000_000_000) // 60 s timeout
+                Logger.shared.log("WhisperKit: transcription TIMED OUT at +\(Int(chunkOffsetSeconds))s")
+                transcriptionTask.cancel()
+            }
+            let results: [TranscriptionResult]
+            do {
+                results = try await transcriptionTask.value
+                timeoutTask.cancel()
+            } catch {
+                timeoutTask.cancel()
+                throw error
+            }
+
+            let chunkElapsed = String(format: "%.1f", Date().timeIntervalSince(chunkT0))
             await MainActor.run { [weak self] in
                 guard let self = self else { return }
                 self.mergeResults(results, chunkOffsetSeconds: chunkOffsetSeconds)
                 self.currentTranscript = self.reconstructFromLedger()
                 self.isTranscribing    = false
-                Logger.shared.log("Transcribed chunk at +\(Int(chunkOffsetSeconds))s – \(self.currentTranscript.count) chars total")
+                Logger.shared.log("WhisperKit: chunk done in \(chunkElapsed)s at +\(Int(chunkOffsetSeconds))s – \(self.currentTranscript.count) chars total")
 
                 // ── Catch-up: if audio accumulated during processing, run immediately ──
                 // This is what closes the gap: instead of waiting up to 25 more seconds
@@ -411,19 +484,20 @@ class AudioEngineManager: NSObject, ObservableObject {
     private func mergeResults(_ results: [TranscriptionResult], chunkOffsetSeconds: Double) {
         for result in results {
             for segment in result.segments {
-                // Filter Whisper hallucination tokens (silence, music, etc.)
-                let segText = segment.text.trimmingCharacters(in: .whitespacesAndNewlines)
-                if segText.isEmpty || suppressedTokens.contains(segText) { continue }
-
                 if let words = segment.words, !words.isEmpty {
                     for wordTiming in words {
+                        // Skip hallucination word tokens — includes split fragments like
+                        // "[BLANK" and "_AUDIO]" that don't fully match [..] on their own.
+                        if isHallucinationWord(wordTiming.word) { continue }
                         let text = wordTiming.word.trimmingCharacters(in: .whitespaces)
-                        if text.isEmpty || suppressedTokens.contains(text) { continue }
+                        if isSuppressedText(text) { continue }
                         let absMs = Int((chunkOffsetSeconds + Double(wordTiming.start)) * 1000)
                         timelineLedger[absMs] = text
                     }
                 } else {
-                    // No word timestamps — store the whole segment at its start time.
+                    // No word timestamps — strip inline tokens from the whole segment.
+                    let segText = stripHallucinationTokens(segment.text)
+                    if isSuppressedText(segText) { continue }
                     let absMs = Int((chunkOffsetSeconds + Double(segment.start)) * 1000)
                     timelineLedger[absMs] = segText
                 }
@@ -433,10 +507,19 @@ class AudioEngineManager: NSObject, ObservableObject {
 
     private func reconstructFromLedger() -> String {
         let sorted = timelineLedger.keys.sorted()
-        var text   = ""
-        var lastMs = -1
+        var text     = ""
+        var lastMs   = -1
+        var lastNorm = ""   // normalised form of the previous word for dedup
         for ms in sorted {
             guard let word = timelineLedger[ms] else { continue }
+
+            // Consecutive-duplicate suppression: skip if this word is the same as the
+            // previous one (case-insensitive, punctuation stripped).  Catches both
+            // Whisper repetition loops and overlap-region double-entries.
+            let norm = word.lowercased().trimmingCharacters(in: .punctuationCharacters)
+            if !norm.isEmpty && norm == lastNorm { continue }
+            lastNorm = norm
+
             if lastMs != -1 && (ms - lastMs) > 2000 {
                 text += "\n\n" + word
             } else {

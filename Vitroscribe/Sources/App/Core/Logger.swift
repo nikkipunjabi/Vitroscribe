@@ -8,7 +8,7 @@ class Logger {
     private init() {
         let fileManager = FileManager.default
         let appSupportURL = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-        let appDirectory = appSupportURL.appendingPathComponent("com.gravitas.Vitroscribe")
+        let appDirectory = appSupportURL.appendingPathComponent("com.nikkipunjabi.Vitroscribe")
         
         try? fileManager.createDirectory(at: appDirectory, withIntermediateDirectories: true)
         

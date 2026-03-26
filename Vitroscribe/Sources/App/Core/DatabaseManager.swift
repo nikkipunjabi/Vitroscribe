@@ -27,7 +27,7 @@ class DatabaseManager {
         do {
             let fileManager = FileManager.default
             let appSupportURL = try fileManager.url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
-            let folderURL = appSupportURL.appendingPathComponent("com.gravitas.Vitroscribe")
+            let folderURL = appSupportURL.appendingPathComponent("com.nikkipunjabi.Vitroscribe")
             try fileManager.createDirectory(at: folderURL, withIntermediateDirectories: true)
             
             let dbURL = folderURL.appendingPathComponent("vitroscribe.sqlite3")

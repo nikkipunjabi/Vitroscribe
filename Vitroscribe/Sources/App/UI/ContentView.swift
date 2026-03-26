@@ -65,15 +65,15 @@ struct ContentView: View {
 
                 // ── Banners ───────────────────────────────────────────────────
 
-                // Whisper model loading banner (first launch)
+                // Whisper model downloading banner (first launch only)
                 if audioManager.isModelLoading {
                     HStack(spacing: 12) {
                         ProgressView().scaleEffect(0.75)
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("Loading AI Transcription Engine")
+                            Text("Downloading AI Transcription Engine")
                                 .fontWeight(.semibold)
                                 .font(.subheadline)
-                            Text("Downloading Whisper model (~465 MB). One-time download — runs fully on-device after this.")
+                            Text("Downloading Whisper multilingual model (~490 MB). One-time download — runs fully on-device after this.")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                         }
@@ -85,6 +85,24 @@ struct ContentView: View {
                     .padding(.horizontal)
                     .padding(.bottom, 4)
                 }
+
+                // Silent model initialisation — shown for ~8s on every launch while
+                // WhisperKit loads the model from disk. Prevents "unavailable" flash.
+                if audioManager.isModelPrewarming {
+                    HStack(spacing: 12) {
+                        ProgressView().scaleEffect(0.75)
+                        Text("Loading transcription engine…")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                        Spacer()
+                    }
+                    .padding(12)
+                    .background(Color.secondary.opacity(0.07))
+                    .cornerRadius(10)
+                    .padding(.horizontal)
+                    .padding(.bottom, 4)
+                }
+
 
                 // Screen-recording permission warning
                 if !meetingDetector.isScreenRecordingAuthorized {
@@ -121,7 +139,7 @@ struct ContentView: View {
                                     LiveEmptyStateView(
                                         isRecording: audioManager.isRecording,
                                         isModelReady: audioManager.isModelReady,
-                                        isModelLoading: audioManager.isModelLoading)
+                                        isModelLoading: audioManager.isModelLoading || audioManager.isModelPrewarming)
                                 } else {
                                     Text(audioManager.currentTranscript)
                                         .padding()
