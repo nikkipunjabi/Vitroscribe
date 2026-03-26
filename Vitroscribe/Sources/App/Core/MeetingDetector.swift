@@ -77,10 +77,11 @@ class MeetingDetector: ObservableObject {
                 let isZoom = ownerName.contains("zoom") && (windowName.contains("meeting") || windowName.contains("call"))
                 // Teams: "Meeting | Microsoft Teams" or "Call |"
                 let isTeams = ownerName.contains("teams") && (windowName.contains("meeting") || windowName.contains("call"))
-                // Meet: active tabs show "Meet – Title" (en dash) or "Meet - Title" (hyphen)
-                let isMeet = windowName.contains("meet - ") || windowName.contains("meet – ")
+                // Note: Google Meet is browser-based — handled by the AppleScript tab check below,
+                // NOT here. Chrome keeps "Meet – …" in the window title even after leaving,
+                // so checking it here causes a false positive that prevents auto-stop.
 
-                if isZoom || isTeams || isMeet {
+                if isZoom || isTeams {
                     meetingFound = true
                     exactMeetingMatch = true
                     detectedTitle = windowName
@@ -159,9 +160,8 @@ class MeetingDetector: ObservableObject {
                     if audioManager.isRecording && !audioManager.isManualRecording {
                         self.consecutiveMisses += 1
                         
-                        // If the Window/URL match is gone for 'missesRequiredToStop' checks, we stop.
-                        // v11.3: Increased to 15 misses (30 seconds) to be more robust against temporary context loss.
-                        if !meetingFound && self.consecutiveMisses >= 15 {
+                        // Stop after 5 consecutive checks (~10 seconds) with no meeting context.
+                        if !meetingFound && self.consecutiveMisses >= 5 {
                             Logger.shared.log("Auto-Detect: Meeting ended (Context lost after 30s). Stopping recording.")
                             self.isMeetingActive = false
                             self.consecutiveMisses = 0
