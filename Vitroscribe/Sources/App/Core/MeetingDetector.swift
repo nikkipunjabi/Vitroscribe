@@ -8,6 +8,9 @@ class MeetingDetector: ObservableObject {
     
     @Published var isMeetingActive: Bool = false
     @Published var isScreenRecordingAuthorized: Bool = true
+    /// True whenever a meeting window/URL is detected, regardless of audio state.
+    /// Used by the menu bar to show a one-click "Start Recording" shortcut.
+    @Published var isInMeetingContext: Bool = false
     private var checkTimer: Timer?
     private var isSuppressed: Bool = false
     
@@ -126,7 +129,10 @@ class MeetingDetector: ObservableObject {
             DispatchQueue.main.async {
                 let audioManager = AudioEngineManager.shared
                 let audioFlowing = AudioStreamMonitor.shared.isAudioFlowing
-                
+
+                // Publish raw context so the menu bar can always show a "Start Recording" shortcut
+                self.isInMeetingContext = meetingFound
+
                 // TRIGGER: Context (URL/Title) AND Audio Flowing
                 let isCurrentlyInMeeting = meetingFound && audioFlowing
                 

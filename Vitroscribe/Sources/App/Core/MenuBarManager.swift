@@ -51,6 +51,12 @@ class MenuBarManager: NSObject, ObservableObject {
             }
             .store(in: &cancellables)
 
+        // Observe meeting context → rebuild menu so the "Meeting Detected" shortcut appears/disappears
+        MeetingDetector.shared.$isInMeetingContext
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in self?.rebuildMenu() }
+            .store(in: &cancellables)
+
         applyVisibilityMode(visibilityMode, animated: false)
     }
 
@@ -139,14 +145,29 @@ class MenuBarManager: NSObject, ObservableObject {
         let menu = NSMenu()
         let audio = AudioEngineManager.shared
 
+        let detector = MeetingDetector.shared
+        let inMeeting = detector.isInMeetingContext
+
         // ── Status ────────────────────────────────────────────────────
         let statusLine = NSMenuItem(
-            title: audio.isRecording ? "● Recording Active" : "○ Waiting for Meeting…",
+            title: audio.isRecording ? "● Recording Active" : (inMeeting ? "● Meeting Detected" : "○ Waiting for Meeting…"),
             action: nil, keyEquivalent: "")
         statusLine.isEnabled = false
         menu.addItem(statusLine)
 
         menu.addItem(.separator())
+
+        // ── Meeting detected but not recording → show prominent prompt ─
+        if inMeeting && !audio.isRecording {
+            let promptItem = NSMenuItem(
+                title: "Meeting Detected — Start Recording",
+                action: #selector(startRecording),
+                keyEquivalent: "")
+            promptItem.image = NSImage(systemSymbolName: "record.circle", accessibilityDescription: nil)
+            promptItem.target = self
+            menu.addItem(promptItem)
+            menu.addItem(.separator())
+        }
 
         // ── Record toggle ─────────────────────────────────────────────
         if audio.isRecording {
@@ -155,7 +176,7 @@ class MenuBarManager: NSObject, ObservableObject {
             item.target = self
             menu.addItem(item)
         } else {
-            let item = NSMenuItem(title: "Start Recording", action: #selector(startRecording), keyEquivalent: "")
+            let item = NSMenuItem(title: "Start Manual Recording", action: #selector(startRecording), keyEquivalent: "")
             item.image = NSImage(systemSymbolName: "mic.badge.plus", accessibilityDescription: nil)
             item.target = self
             menu.addItem(item)
