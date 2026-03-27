@@ -8,13 +8,7 @@ struct SettingsView: View {
     @ObservedObject var audioManager = AudioEngineManager.shared
     @ObservedObject var menuBar = MenuBarManager.shared
     @State private var isLaunchAtStartupEnabled: Bool = StartupManager.shared.isLaunchAtStartupEnabled()
-    @State private var autoRecordMeetings: Bool = {
-        // Default ON — if no value has been saved yet, treat it as enabled
-        if UserDefaults.standard.object(forKey: "autoRecordMeetings") == nil {
-            UserDefaults.standard.set(true, forKey: "autoRecordMeetings")
-        }
-        return UserDefaults.standard.bool(forKey: "autoRecordMeetings")
-    }()
+    @AppStorage("autoRecordMeetings") private var autoRecordMeetings: Bool = true
     
     var body: some View {
         ScrollView {
@@ -53,9 +47,6 @@ struct SettingsView: View {
                             : "Disabled — You will be asked before each meeting is recorded."
                     ) {
                         Toggle("", isOn: $autoRecordMeetings)
-                            .onChange(of: autoRecordMeetings) { newValue in
-                                UserDefaults.standard.set(newValue, forKey: "autoRecordMeetings")
-                            }
                             .labelsHidden()
                     }
 
