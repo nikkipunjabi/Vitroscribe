@@ -77,32 +77,51 @@ class MeetingDetector: ObservableObject {
                     isBrowserOpen = true
                 }
 
-                // Window size — used to detect Teams call view (large window = in-call UI)
-                let bounds = window[kCGWindowBounds as String] as? [String: Any]
-                let winWidth  = bounds?["Width"]  as? CGFloat ?? 0
-                let winHeight = bounds?["Height"] as? CGFloat ?? 0
-                let isLargeWindow = winWidth > 700 && winHeight > 400
-
                 // Zoom: window title contains "meeting" or "call"
                 let isZoom = ownerName.contains("zoom") &&
                     (windowName.contains("meeting") || windowName.contains("call"))
 
-                // Teams native app: title may be just the meeting name (no "meeting"/"call" keyword).
-                // Fall back to a large-window check — when Teams is in a call, the main window
-                // is full/near-full screen.  Exclude the generic "microsoft teams" home screen title.
-                let isTeams = ownerName.contains("microsoft teams") &&
-                    !windowName.isEmpty &&
-                    (windowName.contains("meeting") || windowName.contains("call") ||
-                     windowName.contains("| microsoft teams") ||
-                     (isLargeWindow && windowName != "microsoft teams"))
-
                 // Note: Google Meet is browser-based — handled by the AppleScript tab check below.
+                // Note: Teams is handled separately below via PID-based detection.
 
-                if isZoom || isTeams {
+                if isZoom {
                     meetingFound = true
                     exactMeetingMatch = true
                     detectedTitle = windowName
                     break
+                }
+            }
+
+            // ── Microsoft Teams (native app) ─────────────────────────────────────────
+            // Teams 2.0 does NOT expose kCGWindowName via CGWindowList — window titles are
+            // empty strings, so any string-based match fails. Instead we find the Teams
+            // process by bundle ID via NSRunningApplication, then match windows by PID and
+            // check only the window size (the in-call UI is always a large window).
+            if !exactMeetingMatch {
+                let teamsApp = NSWorkspace.shared.runningApplications.first {
+                    let name   = ($0.localizedName    ?? "").lowercased()
+                    let bundle = ($0.bundleIdentifier ?? "").lowercased()
+                    return name == "microsoft teams" || name == "teams" ||
+                           bundle.contains("com.microsoft.teams")
+                }
+                if let teamsApp = teamsApp {
+                    let teamsPID = teamsApp.processIdentifier
+                    for window in windowList {
+                        guard (window[kCGWindowOwnerPID as String] as? Int32) == teamsPID else { continue }
+                        let bounds = window[kCGWindowBounds as String] as? [String: Any]
+                        let w = bounds?["Width"]  as? CGFloat ?? 0
+                        let h = bounds?["Height"] as? CGFloat ?? 0
+                        // Any large Teams window → in-call UI.
+                        // The audioFlowing gate in the main logic prevents false positives
+                        // when Teams is open for chat but the mic is not in use.
+                        if w > 600 && h > 400 {
+                            meetingFound     = true
+                            exactMeetingMatch = true
+                            let raw = window[kCGWindowName as String] as? String ?? ""
+                            detectedTitle = raw.isEmpty ? "Microsoft Teams" : raw
+                            break
+                        }
+                    }
                 }
             }
 
