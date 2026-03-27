@@ -61,6 +61,9 @@ class MeetingDetector: ObservableObject {
             var exactMeetingMatch = false
             var isBrowserOpen = false
             var detectedTitle: String? = nil
+            // Set to true when the Teams AX check confirms an active call.
+            // In that case we skip the audioFlowing gate so "waiting for others" is detected.
+            var teamsCallConfirmed = false
 
             let browsers = ["google chrome", "arc", "safari", "microsoft edge"]
 
@@ -106,20 +109,41 @@ class MeetingDetector: ObservableObject {
                 }
                 if let teamsApp = teamsApp {
                     let teamsPID = teamsApp.processIdentifier
-                    for window in windowList {
-                        guard (window[kCGWindowOwnerPID as String] as? Int32) == teamsPID else { continue }
-                        let bounds = window[kCGWindowBounds as String] as? [String: Any]
-                        let w = bounds?["Width"]  as? CGFloat ?? 0
-                        let h = bounds?["Height"] as? CGFloat ?? 0
-                        // Any large Teams window → in-call UI.
-                        // The audioFlowing gate in the main logic prevents false positives
-                        // when Teams is open for chat but the mic is not in use.
-                        if w > 600 && h > 400 {
-                            meetingFound     = true
-                            exactMeetingMatch = true
-                            let raw = window[kCGWindowName as String] as? String ?? ""
-                            detectedTitle = raw.isEmpty ? "Microsoft Teams" : raw
-                            break
+                    // Primary: use Accessibility API to find the "Leave" button.
+                    // The Leave/Leave call button only exists when an active call is in progress —
+                    // it is absent from chat, channels, and waiting-room screens.
+                    // This is reliable regardless of window size, title, or Teams version.
+                    if self.teamsIsInActiveCall(pid: teamsPID) {
+                        meetingFound      = true
+                        exactMeetingMatch = true
+                        teamsCallConfirmed = true
+                        // Try to get the meeting title from the window title via AX
+                        let axApp = AXUIElementCreateApplication(teamsPID)
+                        var windowsRef: CFTypeRef?
+                        if AXUIElementCopyAttributeValue(axApp, kAXWindowsAttribute as CFString, &windowsRef) == .success,
+                           let windows = windowsRef as? [AXUIElement], let first = windows.first {
+                            var titleRef: CFTypeRef?
+                            if AXUIElementCopyAttributeValue(first, kAXTitleAttribute as CFString, &titleRef) == .success,
+                               let title = titleRef as? String, !title.isEmpty {
+                                detectedTitle = title
+                            }
+                        }
+                        if detectedTitle == nil { detectedTitle = "Microsoft Teams" }
+                    } else {
+                        // Fallback: large window + audioFlowing gate (handles edge cases where
+                        // accessibility permission is not yet granted).
+                        for window in windowList {
+                            guard (window[kCGWindowOwnerPID as String] as? Int32) == teamsPID else { continue }
+                            let bounds = window[kCGWindowBounds as String] as? [String: Any]
+                            let w = bounds?["Width"]  as? CGFloat ?? 0
+                            let h = bounds?["Height"] as? CGFloat ?? 0
+                            if w > 600 && h > 400 {
+                                meetingFound      = true
+                                exactMeetingMatch = true
+                                let raw = window[kCGWindowName as String] as? String ?? ""
+                                detectedTitle = raw.isEmpty ? "Microsoft Teams" : raw
+                                break
+                            }
                         }
                     }
                 }
@@ -185,8 +209,10 @@ class MeetingDetector: ObservableObject {
                 }
                 self.wasRecordingOnLastTick = audioManager.isRecording
 
-                // TRIGGER: Context (URL/Title) AND Audio Flowing
-                let isCurrentlyInMeeting = meetingFound && audioFlowing
+                // TRIGGER: Context confirmed AND (audio flowing OR Teams AX confirmed an active call).
+                // For Teams we skip the audioFlowing gate because the Leave-button AX check
+                // already proves we're in a real call — even before audio starts ("waiting for others").
+                let isCurrentlyInMeeting = meetingFound && (audioFlowing || teamsCallConfirmed)
 
                 if isCurrentlyInMeeting {
                     self.consecutiveMisses = 0
@@ -334,6 +360,52 @@ class MeetingDetector: ObservableObject {
             self.isSuppressed = false
             Logger.shared.log("Meeting detector: Suppression lifted.")
         }
+    }
+
+    // MARK: - Teams Active-Call Detection (Accessibility API)
+
+    /// Returns true when the Teams app currently shows an active-call UI.
+    /// The "Leave" / "Leave call" button only exists during a live call — it is absent
+    /// from channels, chats, calendar, and the pre-call lobby (before joining).
+    /// This check is immune to window-title and window-size heuristics and works for
+    /// both classic Teams and Teams 2.0, regardless of how the window is sized.
+    private func teamsIsInActiveCall(pid: pid_t) -> Bool {
+        let axApp = AXUIElementCreateApplication(pid)
+        var windowsRef: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(axApp, kAXWindowsAttribute as CFString, &windowsRef) == .success,
+              let windows = windowsRef as? [AXUIElement] else { return false }
+        return windows.contains { axContainsCallButton(in: $0, depth: 0) }
+    }
+
+    /// Recursively searches the AX tree (max 7 levels) for a call-control button.
+    /// Matches buttons whose title contains "leave" or whose identifier/description
+    /// signals an active call (Teams sometimes uses icons without visible titles).
+    private func axContainsCallButton(in element: AXUIElement, depth: Int) -> Bool {
+        guard depth <= 7 else { return false }
+
+        var roleRef: CFTypeRef?
+        if AXUIElementCopyAttributeValue(element, kAXRoleAttribute as CFString, &roleRef) == .success,
+           let role = roleRef as? String, role == "AXButton" {
+            // Check title
+            var titleRef: CFTypeRef?
+            if AXUIElementCopyAttributeValue(element, kAXTitleAttribute as CFString, &titleRef) == .success,
+               let title = titleRef as? String {
+                let t = title.lowercased()
+                if t.contains("leave") || t == "end" || t.contains("end call") { return true }
+            }
+            // Check accessibility description (Teams uses this when title is empty)
+            var descRef: CFTypeRef?
+            if AXUIElementCopyAttributeValue(element, kAXDescriptionAttribute as CFString, &descRef) == .success,
+               let desc = descRef as? String {
+                let d = desc.lowercased()
+                if d.contains("leave") || d.contains("end call") { return true }
+            }
+        }
+
+        var childrenRef: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(element, kAXChildrenAttribute as CFString, &childrenRef) == .success,
+              let children = childrenRef as? [AXUIElement] else { return false }
+        return children.contains { axContainsCallButton(in: $0, depth: depth + 1) }
     }
 
     // MARK: - Title Cleanup
