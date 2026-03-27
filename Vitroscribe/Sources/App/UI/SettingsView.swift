@@ -107,6 +107,7 @@ struct SettingsView: View {
                     Toggle("Show 'Meeting Detected' Popup on Screen Share", isOn: $audioManager.isPromptOverlayShared)
                         .help("If disabled, the 'Meeting Detected' prompt will be invisible to others during your screen share.")
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
                 .padding()
                 .background(Color.secondary.opacity(0.1))
                 .cornerRadius(12)
