@@ -52,19 +52,19 @@
 	<key>DTCompiler</key>
 	<string>com.apple.compilers.llvm.clang.1_0</string>
 	<key>DTPlatformBuild</key>
-	<string>25E236</string>
+	<string>25E251</string>
 	<key>DTPlatformName</key>
 	<string>macosx</string>
 	<key>DTPlatformVersion</key>
 	<string>26.4</string>
 	<key>DTSDKBuild</key>
-	<string>25E236</string>
+	<string>25E251</string>
 	<key>DTSDKName</key>
 	<string>macosx26.4</string>
 	<key>DTXcode</key>
-	<string>2640</string>
+	<string>2641</string>
 	<key>DTXcodeBuild</key>
-	<string>17E192</string>
+	<string>17E202</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>14.0</string>
 	<key>NSAppleEventsUsageDescription</key>
@@ -79,5 +79,9 @@
 	<string>Vitroscribe uses screen capture permission to record system audio from meeting participants.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>Vitroscribe requires speech recognition to transcribe meetings.</string>
+	<key>SUFeedURL</key>
+	<string>https://nikkipunjabi.com/vitroscribe/appcast.xml</string>
+	<key>SUPublicEDKey</key>
+	<string>z5J5O/RCOqvg3JJmGOxn3xGYtMzvo+YgabC3w/cCTBY=</string>
 </dict>
 </plist>

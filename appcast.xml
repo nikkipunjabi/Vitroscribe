@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0"
+     xmlns:sparkle="http://www.andymatern.com/ns/rss/sparkle"
+     xmlns:dc="http://purl.org/dc/elements/1.1/">
+  <channel>
+    <title>Vitroscribe</title>
+    <link>https://nikkipunjabi.com/vitroscribe/appcast.xml</link>
+    <description>Vitroscribe update feed</description>
+    <language>en</language>
+
+    <item>
+      <title>Version 1.0</title>
+      <sparkle:releaseNotesLink>https://nikkipunjabi.com/vitroscribe/release-notes/1.0.html</sparkle:releaseNotesLink>
+      <pubDate>Mon, 21 Apr 2026 00:00:00 +0000</pubDate>
+      <sparkle:version>1.0</sparkle:version>
+      <sparkle:shortVersionString>1.0</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
+      <enclosure
+        url="https://github.com/nikkipunjabi/vitroscribe/releases/download/Release-1.0/Vitroscribe.dmg"
+        sparkle:edSignature="Yqt26ViioNfHsrwfDB89maDb2fXeDe8cCN9Ix/JFAPJK8adZCL7EtpLZDVd/GGY6BboMm141/nE0PCY65mQGAg=="
+        length="7039707"
+        type="application/octet-stream"/>
+    </item>
+
+  </channel>
+</rss>

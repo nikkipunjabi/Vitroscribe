@@ -37,6 +37,10 @@
 			</array>
 		</dict>
 	</array>
+	<key>SUFeedURL</key>
+	<string>https://nikkipunjabi.com/vitroscribe/appcast.xml</string>
+	<key>SUPublicEDKey</key>
+	<string>z5J5O/RCOqvg3JJmGOxn3xGYtMzvo+YgabC3w/cCTBY=</string>
 	<key>CFBundleVersion</key>
 	<string>1</string>
 	<key>LSMinimumSystemVersion</key>

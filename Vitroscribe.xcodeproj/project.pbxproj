@@ -3,7 +3,7 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 77;
+	objectVersion = 63;
 	objects = {
 
 /* Begin PBXBuildFile section */
@@ -30,6 +30,7 @@
 		BC847D668C9DD2B28B29FF66 /* MeetingDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = EEACBD12729DFE9EB28E473C /* MeetingDetector.swift */; };
 		BF8F2864DC25E77C59124D84 /* DatabaseManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B7383C4943BBFCEA29F76F5 /* DatabaseManager.swift */; };
 		D1FC06685D29694422C5C207 /* Logger.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15DC23E45C25C862190E1CE5 /* Logger.swift */; };
+		DB2D78482F97C1B800F81224 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = DB2D78472F97C1B800F81224 /* Sparkle */; };
 		FA2B3C1D8E4A57B09C6D1E23 /* SystemAudioCapture.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA2B3C1C8E4A57B09C6D1E22 /* SystemAudioCapture.swift */; };
 /* End PBXBuildFile section */
 
@@ -66,6 +67,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				DB2D78482F97C1B800F81224 /* Sparkle in Frameworks */,
 				0C60F6605434198D366EA73A /* SQLite in Frameworks */,
 				7857959348F22B3A7C4A9D90 /* WhisperKit in Frameworks */,
 			);
@@ -188,6 +190,7 @@
 			packageProductDependencies = (
 				63BF098A9252301A0E922532 /* SQLite */,
 				7E7DB8C8E7EC68E990555DA0 /* WhisperKit */,
+				DB2D78472F97C1B800F81224 /* Sparkle */,
 			);
 			productName = Vitroscribe;
 			productReference = B34F9C5F71D2C0F71936E412 /* Vitroscribe.app */;
@@ -220,8 +223,8 @@
 			packageReferences = (
 				3B84E659C51733505993E0FF /* XCRemoteSwiftPackageReference "SQLite.swift" */,
 				25FB06991C4B803224E2C5DE /* XCRemoteSwiftPackageReference "WhisperKit" */,
+				DB2D78462F97C1B800F81224 /* XCRemoteSwiftPackageReference "Sparkle" */,
 			);
-			preferredProjectObjectVersion = 77;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
@@ -468,6 +471,14 @@
 				minimumVersion = 0.15.3;
 			};
 		};
+		DB2D78462F97C1B800F81224 /* XCRemoteSwiftPackageReference "Sparkle" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/sparkle-project/Sparkle";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.0.0;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -480,6 +491,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 25FB06991C4B803224E2C5DE /* XCRemoteSwiftPackageReference "WhisperKit" */;
 			productName = WhisperKit;
+		};
+		DB2D78472F97C1B800F81224 /* Sparkle */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = DB2D78462F97C1B800F81224 /* XCRemoteSwiftPackageReference "Sparkle" */;
+			productName = Sparkle;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

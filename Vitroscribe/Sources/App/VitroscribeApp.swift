@@ -1,4 +1,5 @@
 import SwiftUI
+import Sparkle
 
 @main
 struct VitroscribeApp: App {
@@ -34,6 +35,12 @@ struct VitroscribeApp: App {
 }
 
 class AppDelegate: NSObject, NSApplicationDelegate {
+
+    private let updaterController = SPUStandardUpdaterController(
+        startingUpdater: true,
+        updaterDelegate: nil,
+        userDriverDelegate: nil
+    )
 
     func applicationWillFinishLaunching(_ notification: Notification) {
         // Register defaults so first-launch values are correct before any reads
