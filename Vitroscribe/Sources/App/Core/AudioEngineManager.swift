@@ -275,6 +275,23 @@ class AudioEngineManager: NSObject, ObservableObject {
             Logger.shared.log("Audio engine start failed: \(error.localizedDescription)")
             finalizeStop()
         }
+
+        // Start system audio capture (other participants).
+        // Runs concurrently with the mic tap; both feed into audioSamples.
+        if #available(macOS 14.0, *) {
+            let sysCapture = SystemAudioCapture.shared
+            sysCapture.onSamples = { [weak self] samples in
+                guard let self else { return }
+                self.audioQueue.async { self.audioSamples.append(contentsOf: samples) }
+            }
+            Task {
+                do {
+                    try await sysCapture.start()
+                } catch {
+                    Logger.shared.log("SystemAudioCapture: failed to start – \(error.localizedDescription). Continuing with mic only.")
+                }
+            }
+        }
     }
 
     /// Stops the engine capture and kicks off a final async transcription+save.
@@ -286,6 +303,11 @@ class AudioEngineManager: NSObject, ObservableObject {
         chunkTimer?.invalidate(); chunkTimer = nil
         engine.stop()
         engine.inputNode.removeTap(onBus: 0)
+
+        // Stop system audio capture.
+        if #available(macOS 14.0, *) {
+            Task { await SystemAudioCapture.shared.stop() }
+        }
 
         // Update UI immediately so the button and status bar respond right away.
         // The async task below finishes saving in the background.
@@ -329,6 +351,11 @@ class AudioEngineManager: NSObject, ObservableObject {
 
         // Engine may already be stopped; guard against double-stop.
         if engine.isRunning { engine.stop() }
+
+        // Ensure system audio capture is torn down (no-op if already stopped).
+        if #available(macOS 14.0, *) {
+            Task { await SystemAudioCapture.shared.stop() }
+        }
 
         syncLedgerToDatabase()
         Logger.shared.log("Recording stopped – session \(currentSessionId)")

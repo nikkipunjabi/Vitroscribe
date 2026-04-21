@@ -117,7 +117,13 @@ class MeetingDetector: ObservableObject {
                         if w > 600 && h > 400 {
                             meetingFound      = true
                             exactMeetingMatch = true
-                            teamsCallConfirmed = true
+                            // Do NOT set teamsCallConfirmed here. Window size alone only
+                            // tells us Teams is open — not that a call is active.
+                            // teamsCallConfirmed bypasses the audioFlowing gate, which
+                            // causes any audio (YouTube, music) to trigger recording
+                            // whenever Teams happens to have a large window open.
+                            // Instead, rely on audioFlowing (mic capture) like all other
+                            // platforms — Teams captures the mic the moment you join a call.
                             let raw = window[kCGWindowName as String] as? String ?? ""
                             detectedTitle = raw.isEmpty ? "Microsoft Teams" : raw
                             break

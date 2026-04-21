@@ -30,6 +30,7 @@
 		BC847D668C9DD2B28B29FF66 /* MeetingDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = EEACBD12729DFE9EB28E473C /* MeetingDetector.swift */; };
 		BF8F2864DC25E77C59124D84 /* DatabaseManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B7383C4943BBFCEA29F76F5 /* DatabaseManager.swift */; };
 		D1FC06685D29694422C5C207 /* Logger.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15DC23E45C25C862190E1CE5 /* Logger.swift */; };
+		FA2B3C1D8E4A57B09C6D1E23 /* SystemAudioCapture.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA2B3C1C8E4A57B09C6D1E22 /* SystemAudioCapture.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -57,6 +58,7 @@
 		EB8BD4D7EA817D2C70DA757B /* CalendarModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarModels.swift; sourceTree = "<group>"; };
 		ED510B3EB0FA8F17525E6CB3 /* StartupManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StartupManager.swift; sourceTree = "<group>"; };
 		EEACBD12729DFE9EB28E473C /* MeetingDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MeetingDetector.swift; sourceTree = "<group>"; };
+		FA2B3C1C8E4A57B09C6D1E22 /* SystemAudioCapture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemAudioCapture.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -123,6 +125,7 @@
 				EEACBD12729DFE9EB28E473C /* MeetingDetector.swift */,
 				851FDB9CDBB01DD5E0547EB5 /* MenuBarManager.swift */,
 				ED510B3EB0FA8F17525E6CB3 /* StartupManager.swift */,
+				FA2B3C1C8E4A57B09C6D1E22 /* SystemAudioCapture.swift */,
 			);
 			path = Core;
 			sourceTree = "<group>";
@@ -262,6 +265,7 @@
 				6D727FABD7213B7E021EAE07 /* RecordingOverlay.swift in Sources */,
 				6E77DD20875400380FAFB48C /* SettingsView.swift in Sources */,
 				16891B0FA223E6E73F33D040 /* StartupManager.swift in Sources */,
+				FA2B3C1D8E4A57B09C6D1E23 /* SystemAudioCapture.swift in Sources */,
 				79429702740C485E808C5954 /* VitroscribeApp.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

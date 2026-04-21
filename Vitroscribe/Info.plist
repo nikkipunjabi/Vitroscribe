@@ -47,6 +47,8 @@
 	<string>Vitroscribe needs calendar access to view scheduled meetings.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Vitroscribe requires microphone access to record meetings.</string>
+	<key>NSScreenCaptureDescription</key>
+	<string>Vitroscribe uses screen capture permission to record system audio from meeting participants.</string>
 	<key>NSRemindersUsageDescription</key>
 	<string>Vitroscribe needs reminder access.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>

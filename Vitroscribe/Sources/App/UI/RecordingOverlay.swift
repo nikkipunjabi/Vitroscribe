@@ -47,53 +47,38 @@ class RecordingOverlayWindow: NSPanel {
 struct OverlayView: View {
     @ObservedObject private var audioManager = AudioEngineManager.shared
     @State private var isPulsing = false
-    @State private var isHovering = false
-    
+
     var body: some View {
         HStack(spacing: 8) {
-            if isHovering {
-                Button(action: {
-                    audioManager.stopRecording()
-                }) {
-                    Image(systemName: "stop.fill")
-                        .foregroundColor(.white)
-                        .font(.system(size: 14, weight: .bold))
-                        .frame(width: 24, height: 24)
-                        .background(Color.red)
-                        .clipShape(Circle())
-                }
-                .buttonStyle(.plain)
-            } else {
-                Circle()
-                    .fill(Color.red)
-                    .frame(width: 10, height: 10)
-                    .scaleEffect(isPulsing ? 1.2 : 1.0)
-                    .animation(Animation.easeInOut(duration: 0.8).repeatForever(autoreverses: true), value: isPulsing)
-            }
-            
-            Text(isHovering ? "STOP" : "REC")
-                .font(.system(size: 12, weight: .bold, design: .monospaced))
+            Circle()
+                .fill(Color.red)
+                .frame(width: 16, height: 16)
+                .scaleEffect(isPulsing ? 1.3 : 1.0)
+                .animation(Animation.easeInOut(duration: 0.8).repeatForever(autoreverses: true), value: isPulsing)
+
+            Text("REC")
+                .font(.system(size: 14, weight: .bold, design: .monospaced))
                 .foregroundColor(.white)
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .frame(minWidth: 80)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .frame(minWidth: 100)
         .background(
             Capsule()
                 .fill(Color.black.opacity(0.8))
                 .overlay(
                     Capsule()
-                        .stroke(Color.red.opacity(0.5), lineWidth: 1)
+                        .stroke(Color.red.opacity(0.6), lineWidth: 1)
                 )
         )
         .onAppear {
             isPulsing = true
         }
-        .onHover { hovering in
-            withAnimation(.spring()) {
-                isHovering = hovering
-            }
+        .onTapGesture(count: 2) {
+            // Avoid accidental stops when dragging the overlay by requiring a double-click.
+            audioManager.stopRecording()
         }
+        .help("Double-click to stop recording")
     }
 }
 

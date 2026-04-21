@@ -35,10 +35,13 @@ class AudioStreamMonitor: ObservableObject {
             return
         }
         
-        // Check if the device is running
+        // Check if anything is actively capturing from the mic (input scope only).
+        // Using ScopeGlobal would also return true when audio is merely playing
+        // through the same device (e.g. AirPods/headset), causing YouTube playback
+        // to be mistaken for an active meeting.
         var runningAddress = AudioObjectPropertyAddress(
             mSelector: kAudioDevicePropertyDeviceIsRunningSomewhere,
-            mScope: kAudioObjectPropertyScopeGlobal,
+            mScope: kAudioObjectPropertyScopeInput,
             mElement: kAudioObjectPropertyElementMain
         )
         
